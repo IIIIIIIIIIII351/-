@@ -64,6 +64,7 @@
   .pillar-row td { background: #fff8ef; }
   .he-row td { background: #f8eef4; }
   .note { color: var(--muted); font-size: 12px; line-height: 1.8; }
+  .flower-detail { font-size: 12px; color: var(--muted); display: block; margin-top: 2px;}
   code { font-family: Consolas, monospace; }
 </style>
 </head>
@@ -108,10 +109,26 @@
 </div>
 
 <script>
+  // ===== A. 配置区 =====
   const branches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
-  const winds = ['伏藏风','德育风','条达风','高丛风','雷鸣风','粉面风','处景风','论刑风','不周风','沉夺风','凋零风','亡杀风'];
-  const hours = ['泉涌','乡巢','冰融','桃华','萍生','麦熟','角解','鹰挚','祭鸟','养羞','黄落','地冻'];
-  const flowers = ['水仙','梅','杏','桃','牡丹','石榴','荷','兰','桂','菊','芙蓉','山茶'];
+  const winds = ['伏藏风','德育风','条达风','高丛风','雷鸣风','粉面风','阳竟风','论刑风','不周风','沉夺风','凋零风','亡杀风'];
+  const hours = ['泉涌','乡巢','冰融','桃华','虹见','麦熟','角解','鹰挚','祭鸟','养羞','黄落','地冻'];
+  
+  // 扩展：十二花及其一字客与详细含义
+  const flowers = [
+    { name: '水仙', title: '素客', desc: '一阳在下，自私清高，孤芳自赏' },
+    { name: '梅', title: '贞客', desc: '坚贞孕育，顾及家人，暗香护春' },
+    { name: '杏', title: '说客', desc: '向外宣扬，教化显达（杏坛）' },
+    { name: '桃', title: '情客', desc: '爱情繁衍，其乐融融，正道大显' },
+    { name: '牡丹', title: '尊客', desc: '极致决绝，处死残阴，唯我独尊' },
+    { name: '夹竹桃', title: '伪客', desc: '纯阳掩阴，表面光鲜，内在奸恶' },
+    { name: '荷', title: '僧客', desc: '和光同尘，容纳阴浊，红尘修行' },
+    { name: '兰', title: '怨客', desc: '议论刑罚，怨气幽思，怀才不遇' },
+    { name: '桂', title: '肃客', desc: '秋气肃杀，执行刑罚，香烈如刀' },
+    { name: '菊', title: '礼客', desc: '刑杀所得，秋收战利，献祭之财' },
+    { name: '芙蓉', title: '衰客', desc: '被夺之后，肉身腐败，美人迟暮' },
+    { name: '干枝梅', title: '枯客', desc: '假死之木，遇水逢生，暗藏微阳' }
+  ];
 
   // 十二地支：三变 + 四象。太阳=老阳，太阴=老阴。
   const branchAttrs = {
@@ -129,6 +146,24 @@
     '亥': { bian: '阖', xiang: '老阴' }
   };
 
+  const BIAN_HE = {
+    '开开': '枢', '枢枢': '阖', '阖阖': '开',
+    '开枢': '阖', '枢阖': '开', '开阖': '枢'
+  };
+
+  const XIANG_HE_SAME = {
+    '老阳老阳': '少阴', '少阳少阳': '老阳',
+    '老阴老阴': '少阳', '少阴少阴': '老阴'
+  };
+
+  const XIANG_HE_YANG_DAY = { '老阳老阴': '老阳', '少阳少阴': '少阳' };
+  const XIANG_HE_YIN_DAY = { '老阳老阴': '老阴', '少阳少阴': '少阴' };
+  const XIANG_HE_FIXED = {
+    '老阴少阳': '老阳', '老阳少阳': '少阴',
+    '老阳少阴': '老阴', '老阴少阴': '少阳'
+  };
+
+  // ===== B. 算法区 =====
   const monthSelect = document.getElementById('monthSelect');
   const yearSelect = document.getElementById('yearSelect');
   const monthBranchSelect = document.getElementById('monthBranchSelect');
@@ -141,7 +176,6 @@
   const pillarTable = document.getElementById('pillarTable');
   const hegong = document.getElementById('hegong');
 
-  // 默认：子阳、丑阴、寅阳、卯阴……
   const isYang = (index) => index % 2 === 0;
   const mod = (n, m) => ((n % m) + m) % m;
   const samePolarity = (a, b) => isYang(a) === isYang(b);
@@ -161,7 +195,6 @@
   hourSelect.value = '卯';
   dayYinSelect.value = 'auto';
 
-  // 构建一层：月将 M 加在 target 宫位；方向 d=1 顺，d=-1 逆。
   function buildLayer(M, target, d) {
     const arr = Array(12);
     for (let i = 0; i < 12; i++) {
@@ -170,53 +203,38 @@
     return arr;
   }
 
-  // 在某一层中找“原始索引为 elementIdx 的元素”落在哪个宫位。
   function findElementPosition(M, target, d, elementIdx) {
     return mod(target + d * (elementIdx - M), 12);
   }
 
-  // 三变合
   function bianCombine(a, b) {
     const order = { '开': 0, '枢': 1, '阖': 2 };
     const [x, y] = [a, b].sort((p, q) => order[p] - order[q]);
-    const map = {
-      '开开': '枢',
-      '枢枢': '阖',
-      '阖阖': '开',
-      '开枢': '阖',
-      '枢阖': '开',
-      '开阖': '枢'
-    };
-    return map[x + y] || '未定义';
+    return BIAN_HE[x + y] || '未定义';
   }
 
-  // 四象合。统一 太阳=老阳，太阴=老阴。
   function xiangCombine(a, b, dayYin) {
     const norm = v => v === '太阳' ? '老阳' : v === '太阴' ? '老阴' : v;
     a = norm(a); b = norm(b);
-
-    if (a === b) {
-      if (a === '老阳') return '少阴';
-      if (a === '少阳') return '老阳';
-      if (a === '老阴') return '少阳';
-      if (a === '少阴') return '老阴';
+    
+    const sortedKey = [a, b].sort().join('');
+    if (a === b) return XIANG_HE_SAME[a + b];
+    if (dayYin === '阳日' && XIANG_HE_YANG_DAY[sortedKey]) return XIANG_HE_YANG_DAY[sortedKey];
+    if (dayYin === '阴日' && XIANG_HE_YIN_DAY[sortedKey]) return XIANG_HE_YIN_DAY[sortedKey];
+    
+    const fixedKeys = Object.keys(XIANG_HE_FIXED);
+    for (let key of fixedKeys) {
+      if (sortedKey === key.split('').sort().join('')) {
+         if (a.includes(key.slice(0,2)) && b.includes(key.slice(2))) return XIANG_HE_FIXED[key];
+         if (b.includes(key.slice(0,2)) && a.includes(key.slice(2))) return XIANG_HE_FIXED[key];
+      }
     }
 
     const has = (x, y) => (a === x && b === y) || (a === y && b === x);
-
-    // 老阳+老阴：阳日用太阳（老阳），阴日用太阴（老阴）
-    if (has('老阳', '老阴')) return dayYin === '阳日' ? '老阳' : '老阴';
-    // 少阳+少阴：阳日用少阳，阴日用少阴
-    if (has('少阳', '少阴')) return dayYin === '阳日' ? '少阳' : '少阴';
-
-    // 太阴+少阳=太阳 -> 老阴+少阳=老阳
-    if (has('老阴', '少阳')) return '老阳';
-    // 少阳+太阳=少阴 -> 老阳+少阳=少阴
-    if (has('老阳', '少阳')) return '少阴';
-    // 太阳+少阴=太阴 -> 老阳+少阴=老阴
-    if (has('老阳', '少阴')) return '老阴';
-    // 少阴+太阴=少阳 -> 老阴+少阴=少阳
-    if (has('老阴', '少阴')) return '少阳';
+    if (has('老阴','少阳')) return '老阳';
+    if (has('老阳','少阳')) return '少阴';
+    if (has('老阳','少阴')) return '老阴';
+    if (has('老阴','少阴')) return '少阳';
 
     return '未定义';
   }
@@ -227,7 +245,6 @@
     return branches.find(b => branchAttrs[b].bian === bian && branchAttrs[b].xiang === target) || null;
   }
 
-  // 三合顺序：合宫为中间，取前一位、合宫、后一位。
   function sanheOrder(centerBranch) {
     const idx = branches.indexOf(centerBranch);
     return [
@@ -257,6 +274,7 @@
     return v;
   }
 
+  // ===== C. 渲染区 =====
   function renderHe(he) {
     return `<table>
       <thead><tr><th>项</th><th>日支（主）</th><th>时支（客）</th><th>合</th></tr></thead>
@@ -351,14 +369,18 @@
     return svg;
   }
 
-  function renderTable(windNames, hourNames, flowerNames, H0) {
+  function renderTable(windNames, hourNames, flowerIndices, H0) {
     const rows = branches.map((b, i) => {
       const cls = i === H0 ? ' class="hour-row"' : '';
+      const flower = flowers[flowerIndices[i]];
       return `<tr${cls}>
         <td>${b}</td>
         <td>${windNames[i]}</td>
         <td>${hourNames[i]}</td>
-        <td>${flowerNames[i]}</td>
+        <td>
+          <b>${flower.name}</b>（${flower.title}）
+          <span class="flower-detail">${flower.desc}</span>
+        </td>
       </tr>`;
     }).join('');
 
@@ -368,7 +390,7 @@
     </table>`;
   }
 
-  function renderPillarTable(windNames, hourNames, flowerNames, H0) {
+  function renderPillarTable(windNames, hourNames, flowerIndices) {
     const pillars = [
       { name: '年支', idx: branches.indexOf(yearSelect.value) },
       { name: '月支', idx: branches.indexOf(monthBranchSelect.value) },
@@ -379,18 +401,19 @@
     const rows = pillars.map(p => {
       const i = p.idx;
       const cls = p.name === '时支' ? ' class="pillar-row hour-row"' : ' class="pillar-row"';
+      const flower = flowers[flowerIndices[i]];
       return `<tr${cls}>
         <td>${p.name}</td>
         <td>${branches[i]}</td>
         <td>${branches[i]}宫</td>
         <td>${windNames[i]}</td>
         <td>${hourNames[i]}</td>
-        <td>${flowerNames[i]}</td>
+        <td>${flower.name}（${flower.title}）</td>
       </tr>`;
     }).join('');
 
     return `<table>
-      <thead><tr><th>柱</th><th>地支</th><th>所取宫位</th><th>该宫风</th><th>该宫候</th><th>该宫花</th></tr></thead>
+      <thead><tr><th>柱</th><th>地支</th><th>宫位</th><th>该宫风</th><th>该宫候</th><th>该宫花</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
   }
@@ -399,23 +422,20 @@
     const M = branches.indexOf(monthSelect.value);
     const H0 = branches.indexOf(hourSelect.value);
 
-    // 风盘：月将加内盘时支
     const d0 = samePolarity(M, H0) ? 1 : -1;
     const windLayer = buildLayer(M, H0, d0);
     const H1 = findElementPosition(M, H0, d0, H0);
 
-    // 候盘：月将加风盘时支
     const d1 = samePolarity(M, H1) ? 1 : -1;
     const hourLayer = buildLayer(M, H1, d1);
     const H2 = findElementPosition(M, H1, d1, H0);
 
-    // 花盘：月将加候盘时支
     const d2 = samePolarity(M, H2) ? 1 : -1;
     const flowerLayer = buildLayer(M, H2, d2);
 
     const windNames = windLayer.map(i => winds[i]);
     const hourNames = hourLayer.map(i => hours[i]);
-    const flowerNames = flowerLayer.map(i => flowers[i]);
+    const flowerNames = flowerLayer.map(i => flowers[i].name);
 
     const dayIdx = branches.indexOf(daySelect.value);
     const hourIdx = branches.indexOf(hourSelect.value);
@@ -424,7 +444,7 @@
     const he = computeHe(dayIdx, hourIdx, dayYin);
 
     info.innerHTML = `
-      月将：<b>${branches[M]}</b>（风：${winds[M]}；候：${hours[M]}；花：${flowers[M]}）　
+      月将：<b>${branches[M]}</b>（风：${winds[M]}；候：${hours[M]}；花：${flowers[M].name}·${flowers[M].title}）　
       占时支：<b>${branches[H0]}</b><br>
       风盘：月将加内盘时支 <b>${branches[H0]}</b>，${isYang(M) ? '阳' : '阴'}对${isYang(H0) ? '阳' : '阴'}
       → <b>${d0 > 0 ? '顺排' : '逆排'}</b>；风盘时支位落在 <b>${branches[H1]}</b> 宫。<br>
@@ -436,8 +456,8 @@
     `;
 
     chart.innerHTML = renderSVG(windNames, hourNames, flowerNames, M, H0, H1, H2, d0, d1, d2);
-    table.innerHTML = renderTable(windNames, hourNames, flowerNames, H0);
-    pillarTable.innerHTML = renderPillarTable(windNames, hourNames, flowerNames, H0);
+    table.innerHTML = renderTable(windNames, hourNames, flowerLayer, H0);
+    pillarTable.innerHTML = renderPillarTable(windNames, hourNames, flowerLayer);
     hegong.innerHTML = renderHe(he);
   }
 
