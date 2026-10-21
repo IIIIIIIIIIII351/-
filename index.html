@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>十二风候花排盘</title>
+<style>
+  :root {
+    --paper: #fffdf7;
+    --line: #c8b89a;
+    --ink: #2f2a24;
+    --muted: #6d6254;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+    background: #f3eee4;
+    color: var(--ink);
+  }
+  .app { max-width: 1180px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 22px; letter-spacing: 0.08em; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.6; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;
+  }
+  .controls label { font-size: 14px; }
+  select, button {
+    font-family: inherit; font-size: 14px; padding: 6px 8px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: #fff; color: var(--ink);
+  }
+  button { background: #f4ead6; cursor: pointer; }
+  button:hover { background: #eadcc2; }
+  .info {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 12px; padding: 10px 14px; margin-bottom: 12px;
+    font-size: 14px; line-height: 1.7;
+  }
+  .main {
+    display: grid;
+    grid-template-columns: minmax(360px, 720px) 1fr;
+    gap: 20px; align-items: start;
+  }
+  @media (max-width: 980px) { .main { grid-template-columns: 1fr; } }
+  #chart {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 16px; padding: 8px;
+  }
+  #chart svg { width: 100%; height: auto; display: block; }
+  table {
+    width: 100%; border-collapse: collapse; background: var(--paper);
+    border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden; font-size: 14px;
+  }
+  th, td { padding: 8px 10px; border-bottom: 1px solid #e4d8c2; text-align: center; }
+  th { background: #f4ead6; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .hour-row td { background: #fbf0dc; font-weight: 600; }
+  .note { margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>十二风 · 十二候 · 十二花 排盘</h1>
+  <div class="sub">内盘地支不动；月将加时，风、候、花三层按“同顺异逆”叠排。</div>
+
+  <div class="controls">
+    <label>月将：<select id="monthSelect"></select></label>
+    <label>占时支：<select id="hourSelect"></select></label>
+    <button id="swapBtn">交换月将 / 时支</button>
+  </div>
+
+  <div class="info" id="info"></div>
+
+  <div class="main">
+    <div id="chart"></div>
+    <div>
+      <div id="table"></div>
+      <div class="note">
+        规则：月将与时支同为阳或同为阴 → 顺排；一阴一阳 → 逆排。<br>
+        本工具按地支序 子丑寅…为顺排方向；逆排则元素序反向。<br>
+        默认阴阳：子阳、丑阴、寅阳、卯阴……（偶数为阳）。若你的体系不同，可改代码中的 <code>isYang</code>。
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const branches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+  const winds = ['伏藏风','德育风','条达风','高丛风','雷鸣风','粉面风','处景风','论刑风','不周风','沉夺风','凋零风','亡杀风'];
+  const hours = ['泉涌','乡巢','冰融','桃华','萍生','麦熟','角解','鹰挚','祭鸟','养羞','黄落','地冻'];
+  const flowers = ['水仙','梅','杏','桃','牡丹','石榴','荷','兰','桂','菊','芙蓉','山茶'];
+
+  const monthSelect = document.getElementById('monthSelect');
+  const hourSelect = document.getElementById('hourSelect');
+  const info = document.getElementById('info');
+  const chart = document.getElementById('chart');
+  const table = document.getElementById('table');
+
+  // 默认：子阳、丑阴、寅阳、卯阴……
+  const isYang = (index) => index % 2 === 0;
+  const mod = (n, m) => ((n % m) + m) % m;
+
+  branches.forEach((b, i) => {
+    monthSelect.appendChild(new Option(`${b}（${winds[i]}）`, b));
+    hourSelect.appendChild(new Option(b, b));
+  });
+
+  monthSelect.value = '子';
+  hourSelect.value = '卯';
+
+  function buildRing(base, monthIdx, hourIdx, direction) {
+    const arr = Array(12);
+    for (let k = 0; k < 12; k++) {
+      const elemIdx = mod(monthIdx + direction * k, 12);
+      const branchIdx = mod(hourIdx + k, 12);
+      arr[branchIdx] = base[elemIdx];
+    }
+    return arr;
+  }
+
+  function polar(cx, cy, r, deg) {
+    const rad = deg * Math.PI / 180;
+    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+  }
+
+  function sectorPath(cx, cy, r0, r1, a0, a1) {
+    const [x0, y0] = polar(cx, cy, r1, a0);
+    const [x1, y1] = polar(cx, cy, r1, a1);
+    const [x2, y2] = polar(cx, cy, r0, a1);
+    const [x3, y3] = polar(cx, cy, r0, a0);
+    return `M ${x0} ${y0} A ${r1} ${r1} 0 0 1 ${x1} ${y1} L ${x2} ${y2} A ${r0} ${r0} 0 0 0 ${x3} ${y3} Z`;
+  }
+
+  function renderSVG(windMap, hourMap, flowerMap, monthIdx, hourIdx, direction) {
+    const W = 720, C = 360;
+
+    const rings = [
+      { r0: 70,  r1: 130, mid: 100, arr: branches, font: 20, color: '#2f2a24', fillA: '#f8f1e3', fillB: '#fffaf0' },
+      { r0: 130, r1: 190, mid: 160, arr: windMap,  font: 16, color: '#7a3e2b', fillA: '#fbf0e4', fillB: '#fff8ef' },
+      { r0: 190, r1: 250, mid: 220, arr: hourMap,  font: 16, color: '#2f5d50', fillA: '#eef6f0', fillB: '#f8fcf8' },
+      { r0: 250, r1: 310, mid: 280, arr: flowerMap,font: 16, color: '#7a2f5a', fillA: '#f8eef4', fillB: '#fff8fb' }
+    ];
+
+    let svg = `<svg viewBox="0 0 ${W} ${W}" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<circle cx="${C}" cy="${C}" r="340" fill="#fffdf7" stroke="#c8b89a" stroke-width="2"/>`;
+
+    // 环带底色
+    rings.forEach(ring => {
+      for (let j = 0; j < 12; j++) {
+        const center = -90 + j * 30;
+        const fill = j % 2 === 0 ? ring.fillA : ring.fillB;
+        svg += `<path d="${sectorPath(C, C, ring.r0, ring.r1, center - 15, center + 15)}" fill="${fill}" />`;
+      }
+    });
+
+    // 环线
+    [70, 130, 190, 250, 310].forEach(r => {
+      svg += `<circle cx="${C}" cy="${C}" r="${r}" fill="none" stroke="#c8b89a" stroke-width="1"/>`;
+    });
+
+    // 放射线
+    for (let k = 0; k < 12; k++) {
+      const ang = -105 + k * 30;
+      const [x1, y1] = polar(C, C, 70, ang);
+      const [x2, y2] = polar(C, C, 310, ang);
+      svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d8cbb6" stroke-width="1"/>`;
+    }
+
+    // 文字
+    rings.forEach(ring => {
+      for (let i = 0; i < 12; i++) {
+        const ang = -90 + i * 30;
+        const [x, y] = polar(C, C, ring.mid, ang);
+        svg += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle"
+          font-size="${ring.font}" fill="${ring.color}"
+          font-family="Noto Serif SC, Songti SC, SimSun, serif">${ring.arr[i]}</text>`;
+      }
+    });
+
+    // 中心
+    svg += `<circle cx="${C}" cy="${C}" r="52" fill="#f4ead6" stroke="#c8b89a" stroke-width="1"/>`;
+    svg += `<text x="${C}" y="${C - 10}" text-anchor="middle" dominant-baseline="middle"
+      font-size="14" fill="#2f2a24"
+      font-family="Noto Serif SC, Songti SC, SimSun, serif">月将加时</text>`;
+    svg += `<text x="${C}" y="${C + 12}" text-anchor="middle" dominant-baseline="middle"
+      font-size="13" fill="#6d6254"
+      font-family="Noto Serif SC, Songti SC, SimSun, serif">${branches[monthIdx]} → ${branches[hourIdx]} · ${direction > 0 ? '顺' : '逆'}</text>`;
+
+    svg += `</svg>`;
+    return svg;
+  }
+
+  function renderTable(windMap, hourMap, flowerMap, hourIdx) {
+    const rows = branches.map((b, i) => {
+      const cls = i === hourIdx ? ' class="hour-row"' : '';
+      return `<tr${cls}>
+        <td>${b}</td>
+        <td>${windMap[i]}</td>
+        <td>${hourMap[i]}</td>
+        <td>${flowerMap[i]}</td>
+      </tr>`;
+    }).join('');
+
+    return `<table>
+      <thead><tr><th>地支</th><th>十二风</th><th>十二候</th><th>十二花</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  function render() {
+    const monthIdx = branches.indexOf(monthSelect.value);
+    const hourIdx = branches.indexOf(hourSelect.value);
+    const same = isYang(monthIdx) === isYang(hourIdx);
+    const direction = same ? 1 : -1;
+
+    const windMap = buildRing(winds, monthIdx, hourIdx, direction);
+    const hourMap = buildRing(hours, monthIdx, hourIdx, direction);
+    const flowerMap = buildRing(flowers, monthIdx, hourIdx, direction);
+
+    info.innerHTML = `
+      月将：<b>${branches[monthIdx]}</b>（${winds[monthIdx]}）　
+      占时支：<b>${branches[hourIdx]}</b>　
+      月将${isYang(monthIdx) ? '阳' : '阴'}，时支${isYang(hourIdx) ? '阳' : '阴'}
+      → <b>${same ? '同气相求，顺排' : '阴阳相异，逆排'}</b>
+    `;
+
+    chart.innerHTML = renderSVG(windMap, hourMap, flowerMap, monthIdx, hourIdx, direction);
+    table.innerHTML = renderTable(windMap, hourMap, flowerMap, hourIdx);
+  }
+
+  monthSelect.addEventListener('change', render);
+  hourSelect.addEventListener('change', render);
+
+  document.getElementById('swapBtn').addEventListener('click', () => {
+    const m = monthSelect.value;
+    monthSelect.value = hourSelect.value;
+    hourSelect.value = m;
+    render();
+  });
+
+  render();
+</script>
+</body>
+</html>
