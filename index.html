@@ -3,13 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>十二风候花排盘 · 逐层加时 · 主客合宫</title>
+<title>术数排盘平台</title>
 <style>
   :root {
     --paper: #fffdf7;
     --line: #c8b89a;
     --ink: #2f2a24;
     --muted: #6d6254;
+    --primary: #7a3e2b;
+    --highlight: #e6d5b8;
   }
   * { box-sizing: border-box; }
   body {
@@ -17,455 +19,624 @@
     font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
     background: #f3eee4;
     color: var(--ink);
+    min-height: 100vh;
   }
-  .app { max-width: 1320px; margin: 0 auto; padding: 20px; }
-  h1 { font-size: 22px; letter-spacing: 0.08em; margin: 0 0 6px; }
-  .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.7; }
+  .app { max-width: 1320px; margin: 0 auto; padding: 20px; display: none; }
+  .app.active { display: block; }
+  
+  /* 修复：菜单默认隐藏，只有带 active 时才以 flex 显示 */
+  #menu-view { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+  #menu-view.active { display: flex; }
+
+  /* 头部通用 */
+  .header { display: flex; align-items: center; margin-bottom: 20px; gap: 16px; }
+  .header h1 { font-size: 22px; letter-spacing: 0.08em; margin: 0; }
+  .back-btn {
+    background: var(--paper); border: 1px solid var(--line); color: var(--primary);
+    padding: 6px 12px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 14px;
+    text-decoration: none; display: inline-block;
+  }
+  .back-btn:hover { background: var(--highlight); }
+
+  /* 首页菜单 */
+  .menu-title { font-size: 32px; letter-spacing: 0.2em; margin-bottom: 40px; color: var(--primary); text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+  .menu-grid { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; }
+  .menu-card {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 16px;
+    width: 280px; height: 200px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: all 0.3s;
+  }
+  .menu-card:hover { transform: translateY(-5px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-color: var(--primary); }
+  .menu-card h2 { font-size: 24px; color: var(--primary); margin: 0 0 10px; }
+  .menu-card p { color: var(--muted); font-size: 14px; margin: 0; }
+
+  /* 控制区与表单 */
   .controls {
-    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
     background: var(--paper); border: 1px solid var(--line);
     border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;
   }
-  .controls label { font-size: 14px; }
-  select, button {
+  .controls label { font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  select, input, button {
     font-family: inherit; font-size: 14px; padding: 6px 8px;
     border: 1px solid var(--line); border-radius: 8px;
     background: #fff; color: var(--ink);
   }
-  button { background: #f4ead6; cursor: pointer; }
-  button:hover { background: #eadcc2; }
-  .info {
+  .action-btn { background: #f4ead6; cursor: pointer; padding: 8px 16px; font-weight: 600; color: var(--primary); border: 1px solid var(--line); }
+  .action-btn:hover { background: #eadcc2; }
+
+  /* 风候花星样式 */
+  .info-box {
     background: var(--paper); border: 1px solid var(--line);
     border-radius: 12px; padding: 10px 14px; margin-bottom: 12px;
     font-size: 14px; line-height: 1.8;
   }
-  .info b { color: #7a3e2b; }
-  .main {
-    display: grid;
-    grid-template-columns: minmax(380px, 760px) 1fr;
+  .info-box b { color: var(--primary); }
+  .main-grid {
+    display: grid; grid-template-columns: minmax(380px, 760px) 1fr;
     gap: 20px; align-items: start;
   }
-  @media (max-width: 1080px) { .main { grid-template-columns: 1fr; } }
-  #chart {
-    background: var(--paper); border: 1px solid var(--line);
-    border-radius: 16px; padding: 8px;
-  }
-  #chart svg { width: 100%; height: auto; display: block; }
-  h2 { font-size: 16px; margin: 0 0 8px; letter-spacing: 0.06em; }
-  table {
-    width: 100%; border-collapse: collapse; background: var(--paper);
-    border: 1px solid var(--line); border-radius: 12px;
-    overflow: hidden; font-size: 14px; margin-bottom: 16px;
-  }
+  @media (max-width: 1080px) { .main-grid { grid-template-columns: 1fr; } }
+  .chart-box { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 8px; }
+  .chart-box svg { width: 100%; height: auto; display: block; }
+  table { width: 100%; border-collapse: collapse; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 14px; margin-bottom: 16px; }
   th, td { padding: 7px 8px; border-bottom: 1px solid #e4d8c2; text-align: center; }
   th { background: #f4ead6; font-weight: 600; }
   tr:last-child td { border-bottom: none; }
   .hour-row td { background: #fbf0dc; font-weight: 600; }
-  .pillar-row td { background: #fff8ef; }
   .he-row td { background: #f8eef4; }
-  .note { color: var(--muted); font-size: 12px; line-height: 1.8; }
+
+  /* 天罡小六壬特有 */
+  .tg-inputs { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; background: var(--paper); padding: 16px; border-radius: 12px; border: 1px solid var(--line); }
+  .pillar-select { display: flex; flex-direction: column; gap: 6px; }
+  .pillar-select div { display: flex; gap: 4px; }
+  .step-text { font-size: 14px; line-height: 2; margin-bottom: 16px; }
+  .step-text span { color: var(--primary); font-weight: bold; }
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 768px) { .result-grid { grid-template-columns: 1fr; } }
+  
+  /* 天罡四正展示区 */
+  .tg-board {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 30px;
+  }
+  .tg-pillars-display {
+    font-size: 18px; letter-spacing: 2px; margin-bottom: 30px; padding-bottom: 10px;
+    border-bottom: 1px dashed var(--line); text-align: center; width: 100%;
+  }
+  .tg-pillars-display span { margin: 0 8px; }
+  .tg-pillars-display .xunkong { font-size: 14px; color: var(--muted); }
+  
+  /* 十字盘布局 */
+  .square-grid { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr 1fr; 
+    grid-template-rows: 1fr 1fr 1fr; 
+    width: 260px; height: 260px; 
+    gap: 6px; 
+    position: relative;
+  }
+  /* 隐形的底盘 (左卯右酉，上午下子) */
+  .ground-bg {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center; pointer-events: none;
+  }
+  .ground-cross { position: absolute; width: 100%; height: 1px; background: var(--line); }
+  .ground-cross.vertical { width: 1px; height: 100%; }
+  
+  .cell { 
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 28px; color: var(--primary); font-weight: bold; 
+    z-index: 1; position: relative;
+  }
+  .cell.empty { visibility: hidden; }
+  .cell.center { font-size: 14px; color: var(--muted); text-align: center; line-height: 1.4; background: var(--paper); z-index: 2;}
+  .cell-sub { font-size: 12px; color: var(--muted); font-weight: normal; margin-top: 4px; }
+  
+  .note { color: var(--muted); font-size: 12px; line-height: 1.8; margin-top: 10px; text-align: center; }
   .flower-detail { font-size: 12px; color: var(--muted); display: block; margin-top: 2px;}
-  code { font-family: Consolas, monospace; }
 </style>
 </head>
 <body>
-<div class="app">
-  <h1>十二风 · 十二候 · 十二花 排盘</h1>
-  <div class="sub">
-    内盘地支不动。风盘月将加内盘时支；候盘月将加风盘时支；花盘月将加候盘时支。
-    每层均按“月将与目标位同阴同阳则顺排，一阴一阳则逆排”。另加主客日支、时支合宫与三合顺序。
-  </div>
 
+<!-- ================= 首页选择 ================= -->
+<div id="menu-view" class="active">
+  <div class="menu-title">术数 推演</div>
+  <div class="menu-grid">
+    <div class="menu-card" onclick="switchView('fenghou')">
+      <h2>风候花星</h2>
+      <p>十二风 · 十二候 · 十二花</p>
+    </div>
+    <div class="menu-card" onclick="switchView('tiangang')">
+      <h2>天罡小六壬</h2>
+      <p>北斗起日 · 四正定局</p>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 风候花星模块 ================= -->
+<div id="fenghou-view" class="app">
+  <div class="header">
+    <button class="back-btn" onclick="switchView('menu')">← 返回主页</button>
+    <h1>风候花星 排盘</h1>
+  </div>
   <div class="controls">
-    <label>月将：<select id="monthSelect"></select></label>
-    <label>年支：<select id="yearSelect"></select></label>
-    <label>月支：<select id="monthBranchSelect"></select></label>
-    <label>日支：<select id="daySelect"></select></label>
-    <label>时支：<select id="hourSelect"></select></label>
-    <label>日阴阳：<select id="dayYinSelect">
+    <label>月将：<select id="fh-month"></select></label>
+    <label>年支：<select id="fh-year"></select></label>
+    <label>月支：<select id="fh-month-b"></select></label>
+    <label>日支：<select id="fh-day"></select></label>
+    <label>时支：<select id="fh-hour"></select></label>
+    <label>日阴阳：<select id="fh-day-yin">
       <option value="auto">按日支自动</option>
       <option value="阳日">阳日</option>
       <option value="阴日">阴日</option>
     </select></label>
   </div>
-
-  <div class="info" id="info"></div>
-
-  <div class="main">
-    <div id="chart"></div>
+  <div class="info-box" id="fh-info"></div>
+  <div class="main-grid">
+    <div class="chart-box" id="fh-chart"></div>
     <div>
       <h2>十二宫风候花</h2>
-      <div id="table"></div>
+      <div id="fh-table"></div>
       <h2>年月日时四支取宫</h2>
-      <div id="pillarTable"></div>
+      <div id="fh-pillar-table"></div>
       <h2>主客合宫（日支 + 时支）</h2>
-      <div id="hegong"></div>
-      <div class="note">
-        合宫规则：先合三变，再合四象，双属性定位合宫；三合顺序以合宫为中间，取“前一位、合宫、后一位”。
-        太阳按老阳、太阴按老阴统一计算。阳日/阴日可手动切换，默认按日支阴阳。
+      <div id="fh-hegong"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 天罡小六壬模块 ================= -->
+<div id="tiangang-view" class="app">
+  <div class="header">
+    <button class="back-btn" onclick="switchView('menu')">← 返回主页</button>
+    <h1>天罡小六壬</h1>
+  </div>
+  
+  <div class="tg-inputs">
+    <label class="pillar-select">
+      <span>农历月份</span>
+      <select id="tg-month" class="action-btn"></select>
+    </label>
+    <label class="pillar-select">
+      <span>农历日</span>
+      <select id="tg-day-num" class="action-btn"></select>
+    </label>
+    <div class="pillar-select">
+      <span>年柱</span>
+      <div><select id="tg-year-g"></select><select id="tg-year-z"></select></div>
+    </div>
+    <div class="pillar-select">
+      <span>月柱</span>
+      <div><select id="tg-month-g"></select><select id="tg-month-z"></select></div>
+    </div>
+    <div class="pillar-select">
+      <span>日柱</span>
+      <div><select id="tg-day-g"></select><select id="tg-day-z"></select></div>
+    </div>
+    <div class="pillar-select">
+      <span>时柱</span>
+      <div><select id="tg-hour-g"></select><select id="tg-hour-z"></select></div>
+    </div>
+    <button class="action-btn" id="tg-calc-btn" style="margin-top: 20px;">起局排盘</button>
+  </div>
+
+  <div class="info-box" id="tg-info"></div>
+  
+  <div class="result-grid">
+    <div>
+      <h2>排局步骤</h2>
+      <div class="step-text" id="tg-steps" style="background: var(--paper); padding: 16px; border-radius: 12px; border: 1px solid var(--line);"></div>
+    </div>
+    <div>
+      <h2>卦局呈现</h2>
+      <div class="tg-board" id="tg-board">
+        <!-- 四柱及四正由 JS 动态渲染 -->
       </div>
     </div>
   </div>
 </div>
 
 <script>
-  // ===== A. 配置区 =====
-  const branches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
-  const winds = ['伏藏风','德育风','条达风','高丛风','雷鸣风','粉面风','阳竟风','论刑风','不周风','沉夺风','凋零风','亡杀风'];
-  const hours = ['泉涌','乡巢','冰融','桃华','虹见','麦熟','角解','鹰挚','祭鸟','养羞','黄落','地冻'];
-  
-  // 扩展：十二花及其一字客与详细含义
-  const flowers = [
-    { name: '水仙', title: '素客', desc: '一阳在下，自私清高，孤芳自赏' },
-    { name: '梅', title: '贞客', desc: '坚贞孕育，顾及家人，暗香护春' },
-    { name: '杏', title: '说客', desc: '向外宣扬，教化显达（杏坛）' },
-    { name: '桃', title: '情客', desc: '爱情繁衍，其乐融融，正道大显' },
-    { name: '牡丹', title: '尊客', desc: '极致决绝，处死残阴，唯我独尊' },
-    { name: '夹竹桃', title: '伪客', desc: '纯阳掩阴，表面光鲜，内在奸恶' },
-    { name: '荷', title: '僧客', desc: '和光同尘，容纳阴浊，红尘修行' },
-    { name: '兰', title: '怨客', desc: '议论刑罚，怨气幽思，怀才不遇' },
-    { name: '桂', title: '肃客', desc: '秋气肃杀，执行刑罚，香烈如刀' },
-    { name: '菊', title: '礼客', desc: '刑杀所得，秋收战利，献祭之财' },
-    { name: '芙蓉', title: '衰客', desc: '被夺之后，肉身腐败，美人迟暮' },
-    { name: '干枝梅', title: '枯客', desc: '假死之木，遇水逢生，暗藏微阳' }
+// ==========================================
+// 路由控制
+// ==========================================
+function switchView(viewName) {
+  document.querySelectorAll('.app, #menu-view').forEach(el => el.classList.remove('active'));
+  if (viewName === 'menu') {
+    document.getElementById('menu-view').classList.add('active');
+  } else {
+    document.getElementById(viewName + '-view').classList.add('active');
+  }
+}
+
+// ==========================================
+// 基础数据与定义
+// ==========================================
+const branches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+const stems = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+
+const yangStems = ['甲','丙','戊','庚','壬'];
+const yangBranches = ['子','寅','辰','午','申','戌'];
+const yinBranches = ['丑','卯','巳','未','酉','亥']; // <--- 修复：补上遗漏的阴支数组
+
+// ==========================================
+// 风候花星逻辑
+// ==========================================
+const winds = ['伏藏风','德育风','条达风','高丛风','雷鸣风','粉面风','阳竟风','论刑风','不周风','沉夺风','凋零风','亡杀风'];
+const hours = ['泉涌','乡巢','冰融','桃华','虹见','麦熟','角解','鹰挚','祭鸟','养羞','黄落','地冻'];
+const flowers = [
+  { name: '水仙', title: '素客', desc: '一阳在下，自私清高，孤芳自赏' },
+  { name: '梅', title: '贞客', desc: '坚贞孕育，顾及家人，暗香护春' },
+  { name: '杏', title: '说客', desc: '向外宣扬，教化显达（杏坛）' },
+  { name: '桃', title: '情客', desc: '爱情繁衍，其乐融融，正道大显' },
+  { name: '牡丹', title: '尊客', desc: '极致决绝，处死残阴，唯我独尊' },
+  { name: '夹竹桃', title: '伪客', desc: '纯阳掩阴，表面光鲜，内在奸恶' },
+  { name: '荷', title: '僧客', desc: '和光同尘，容纳阴浊，红尘修行' },
+  { name: '兰', title: '怨客', desc: '议论刑罚，怨气幽思，怀才不遇' },
+  { name: '桂', title: '肃客', desc: '秋气肃杀，执行刑罚，香烈如刀' },
+  { name: '菊', title: '礼客', desc: '刑杀所得，秋收战利，献祭之财' },
+  { name: '芙蓉', title: '衰客', desc: '被夺之后，肉身腐败，美人迟暮' },
+  { name: '干枝梅', title: '枯客', desc: '假死之木，遇水逢生，暗藏微阳' }
+];
+const branchAttrs = {
+  '子': { bian: '开', xiang: '老阴' }, '丑': { bian: '枢', xiang: '老阴' },
+  '寅': { bian: '阖', xiang: '少阳' }, '卯': { bian: '开', xiang: '少阳' },
+  '辰': { bian: '枢', xiang: '少阳' }, '巳': { bian: '阖', xiang: '老阳' },
+  '午': { bian: '开', xiang: '老阳' }, '未': { bian: '枢', xiang: '老阳' },
+  '申': { bian: '阖', xiang: '少阴' }, '酉': { bian: '开', xiang: '少阴' },
+  '戌': { bian: '枢', xiang: '少阴' }, '亥': { bian: '阖', xiang: '老阴' }
+};
+const BIAN_HE = { '开开': '枢', '枢枢': '阖', '阖阖': '开', '开枢': '阖', '枢阖': '开', '开阖': '枢' };
+const XIANG_HE_SAME = { '老阳老阳': '少阴', '少阳少阳': '老阳', '老阴老阴': '少阳', '少阴少阴': '老阴' };
+const XIANG_HE_YANG_DAY = { '老阳老阴': '老阳', '少阳少阴': '少阳' };
+const XIANG_HE_YIN_DAY = { '老阳老阴': '老阴', '少阳少阴': '少阴' };
+
+const fhMonthSelect = document.getElementById('fh-month');
+const fhYearSelect = document.getElementById('fh-year');
+const fhMonthBranchSelect = document.getElementById('fh-month-b');
+const fhDaySelect = document.getElementById('fh-day');
+const fhHourSelect = document.getElementById('fh-hour');
+const fhDayYinSelect = document.getElementById('fh-day-yin');
+const fhInfo = document.getElementById('fh-info');
+const fhChart = document.getElementById('fh-chart');
+const fhTable = document.getElementById('fh-table');
+const fhPillarTable = document.getElementById('fh-pillar-table');
+const fhHegong = document.getElementById('fh-hegong');
+
+const isYang = (index) => index % 2 === 0;
+const mod = (n, m) => ((n % m) + m) % m;
+const samePolarity = (a, b) => isYang(a) === isYang(b);
+
+branches.forEach((b, i) => {
+  fhMonthSelect.appendChild(new Option(`${b}（${winds[i]}）`, b));
+  fhYearSelect.appendChild(new Option(b, b));
+  fhMonthBranchSelect.appendChild(new Option(b, b));
+  fhDaySelect.appendChild(new Option(b, b));
+  fhHourSelect.appendChild(new Option(b, b));
+});
+fhMonthSelect.value = '子'; fhYearSelect.value = '子'; fhMonthBranchSelect.value = '丑'; fhDaySelect.value = '寅'; fhHourSelect.value = '卯';
+
+function buildLayer(M, target, d) {
+  const arr = Array(12);
+  for (let i = 0; i < 12; i++) arr[i] = mod(M + d * (i - target), 12);
+  return arr;
+}
+function findElementPosition(M, target, d, elementIdx) {
+  return mod(target + d * (elementIdx - M), 12);
+}
+function bianCombine(a, b) {
+  const order = { '开': 0, '枢': 1, '阖': 2 };
+  const [x, y] = [a, b].sort((p, q) => order[p] - order[q]);
+  return BIAN_HE[x + y] || '未定义';
+}
+function xiangCombine(a, b, dayYin) {
+  const norm = v => v === '太阳' ? '老阳' : v === '太阴' ? '老阴' : v;
+  a = norm(a); b = norm(b);
+  const sortedKey = [a, b].sort().join('');
+  if (a === b) return XIANG_HE_SAME[a + b];
+  if (dayYin === '阳日' && XIANG_HE_YANG_DAY[sortedKey]) return XIANG_HE_YANG_DAY[sortedKey];
+  if (dayYin === '阴日' && XIANG_HE_YIN_DAY[sortedKey]) return XIANG_HE_YIN_DAY[sortedKey];
+  const has = (x, y) => (a === x && b === y) || (a === y && b === x);
+  if (has('老阴','少阳')) return '老阳';
+  if (has('老阳','少阳')) return '少阴';
+  if (has('老阳','少阴')) return '老阴';
+  if (has('老阴','少阴')) return '少阳';
+  return '未定义';
+}
+function findBranchByAttrs(bian, xiang) {
+  const norm = v => v === '太阳' ? '老阳' : v === '太阴' ? '老阴' : v;
+  return branches.find(b => branchAttrs[b].bian === bian && branchAttrs[b].xiang === norm(xiang)) || null;
+}
+function sanheOrder(centerBranch) {
+  const idx = branches.indexOf(centerBranch);
+  return [branches[mod(idx - 4, 12)], branches[idx], branches[mod(idx + 4, 12)]];
+}
+function computeHe(dayIdx, hourIdx, dayYin) {
+  const dayAttr = branchAttrs[branches[dayIdx]];
+  const hourAttr = branchAttrs[branches[hourIdx]];
+  const heBian = bianCombine(dayAttr.bian, hourAttr.bian);
+  const heXiang = xiangCombine(dayAttr.xiang, hourAttr.xiang, dayYin);
+  const heBranch = findBranchByAttrs(heBian, heXiang);
+  return { dayB: branches[dayIdx], hourB: branches[hourIdx], dayAttr, hourAttr, heBian, heXiang, heBranch, sanhe: heBranch ? sanheOrder(heBranch) : ['未定义'], dayYin };
+}
+function fmtXiang(v) { return v === '老阳' ? '老阳（太阳）' : v === '老阴' ? '老阴（太阴）' : v; }
+
+function polar(cx, cy, r, deg) { const rad = deg * Math.PI / 180; return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)]; }
+function sectorPath(cx, cy, r0, r1, a0, a1) {
+  const [x0, y0] = polar(cx, cy, r1, a0); const [x1, y1] = polar(cx, cy, r1, a1);
+  const [x2, y2] = polar(cx, cy, r0, a1); const [x3, y3] = polar(cx, cy, r0, a0);
+  return `M ${x0} ${y0} A ${r1} ${r1} 0 0 1 ${x1} ${y1} L ${x2} ${y2} A ${r0} ${r0} 0 0 0 ${x3} ${y3} Z`;
+}
+function renderSVG(windNames, hourNames, flowerNames, M, H0, H1, H2, d0, d1, d2) {
+  const W = 720, C = 360;
+  const rings = [
+    { r0: 70, r1: 130, mid: 100, arr: branches, font: 20, color: '#2f2a24', fillA: '#f8f1e3', fillB: '#fffaf0' },
+    { r0: 130, r1: 190, mid: 160, arr: windNames, font: 15, color: '#7a3e2b', fillA: '#fbf0e4', fillB: '#fff8ef' },
+    { r0: 190, r1: 250, mid: 220, arr: hourNames, font: 15, color: '#2f5d50', fillA: '#eef6f0', fillB: '#f8fcf8' },
+    { r0: 250, r1: 310, mid: 280, arr: flowerNames, font: 15, color: '#7a2f5a', fillA: '#f8eef4', fillB: '#fff8fb' }
   ];
-
-  // 十二地支：三变 + 四象。太阳=老阳，太阴=老阴。
-  const branchAttrs = {
-    '子': { bian: '开', xiang: '老阴' },
-    '丑': { bian: '枢', xiang: '老阴' },
-    '寅': { bian: '阖', xiang: '少阳' },
-    '卯': { bian: '开', xiang: '少阳' },
-    '辰': { bian: '枢', xiang: '少阳' },
-    '巳': { bian: '阖', xiang: '老阳' },
-    '午': { bian: '开', xiang: '老阳' },
-    '未': { bian: '枢', xiang: '老阳' },
-    '申': { bian: '阖', xiang: '少阴' },
-    '酉': { bian: '开', xiang: '少阴' },
-    '戌': { bian: '枢', xiang: '少阴' },
-    '亥': { bian: '阖', xiang: '老阴' }
-  };
-
-  const BIAN_HE = {
-    '开开': '枢', '枢枢': '阖', '阖阖': '开',
-    '开枢': '阖', '枢阖': '开', '开阖': '枢'
-  };
-
-  const XIANG_HE_SAME = {
-    '老阳老阳': '少阴', '少阳少阳': '老阳',
-    '老阴老阴': '少阳', '少阴少阴': '老阴'
-  };
-
-  const XIANG_HE_YANG_DAY = { '老阳老阴': '老阳', '少阳少阴': '少阳' };
-  const XIANG_HE_YIN_DAY = { '老阳老阴': '老阴', '少阳少阴': '少阴' };
-  const XIANG_HE_FIXED = {
-    '老阴少阳': '老阳', '老阳少阳': '少阴',
-    '老阳少阴': '老阴', '老阴少阴': '少阳'
-  };
-
-  // ===== B. 算法区 =====
-  const monthSelect = document.getElementById('monthSelect');
-  const yearSelect = document.getElementById('yearSelect');
-  const monthBranchSelect = document.getElementById('monthBranchSelect');
-  const daySelect = document.getElementById('daySelect');
-  const hourSelect = document.getElementById('hourSelect');
-  const dayYinSelect = document.getElementById('dayYinSelect');
-  const info = document.getElementById('info');
-  const chart = document.getElementById('chart');
-  const table = document.getElementById('table');
-  const pillarTable = document.getElementById('pillarTable');
-  const hegong = document.getElementById('hegong');
-
-  const isYang = (index) => index % 2 === 0;
-  const mod = (n, m) => ((n % m) + m) % m;
-  const samePolarity = (a, b) => isYang(a) === isYang(b);
-
-  branches.forEach((b, i) => {
-    monthSelect.appendChild(new Option(`${b}（${winds[i]}）`, b));
-    yearSelect.appendChild(new Option(b, b));
-    monthBranchSelect.appendChild(new Option(b, b));
-    daySelect.appendChild(new Option(b, b));
-    hourSelect.appendChild(new Option(b, b));
+  let svg = `<svg viewBox="0 0 ${W} ${W}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += `<circle cx="${C}" cy="${C}" r="340" fill="#fffdf7" stroke="#c8b89a" stroke-width="2"/>`;
+  rings.forEach(ring => {
+    for (let j = 0; j < 12; j++) {
+      const center = -90 + j * 30;
+      svg += `<path d="${sectorPath(C, C, ring.r0, ring.r1, center - 15, center + 15)}" fill="${j % 2 === 0 ? ring.fillA : ring.fillB}" />`;
+    }
   });
-
-  monthSelect.value = '子';
-  yearSelect.value = '子';
-  monthBranchSelect.value = '丑';
-  daySelect.value = '寅';
-  hourSelect.value = '卯';
-  dayYinSelect.value = 'auto';
-
-  function buildLayer(M, target, d) {
-    const arr = Array(12);
+  [70, 130, 190, 250, 310].forEach(r => svg += `<circle cx="${C}" cy="${C}" r="${r}" fill="none" stroke="#c8b89a" stroke-width="1"/>`);
+  for (let k = 0; k < 12; k++) {
+    const [x1, y1] = polar(C, C, 70, -105 + k * 30); const [x2, y2] = polar(C, C, 310, -105 + k * 30);
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d8cbb6" stroke-width="1"/>`;
+  }
+  rings.forEach(ring => {
     for (let i = 0; i < 12; i++) {
-      arr[i] = mod(M + d * (i - target), 12);
+      const [x, y] = polar(C, C, ring.mid, -90 + i * 30);
+      svg += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${ring.font}" fill="${ring.color}" font-family="Noto Serif SC, Songti SC, SimSun, serif">${ring.arr[i]}</text>`;
     }
-    return arr;
-  }
-
-  function findElementPosition(M, target, d, elementIdx) {
-    return mod(target + d * (elementIdx - M), 12);
-  }
-
-  function bianCombine(a, b) {
-    const order = { '开': 0, '枢': 1, '阖': 2 };
-    const [x, y] = [a, b].sort((p, q) => order[p] - order[q]);
-    return BIAN_HE[x + y] || '未定义';
-  }
-
-  function xiangCombine(a, b, dayYin) {
-    const norm = v => v === '太阳' ? '老阳' : v === '太阴' ? '老阴' : v;
-    a = norm(a); b = norm(b);
-    
-    const sortedKey = [a, b].sort().join('');
-    if (a === b) return XIANG_HE_SAME[a + b];
-    if (dayYin === '阳日' && XIANG_HE_YANG_DAY[sortedKey]) return XIANG_HE_YANG_DAY[sortedKey];
-    if (dayYin === '阴日' && XIANG_HE_YIN_DAY[sortedKey]) return XIANG_HE_YIN_DAY[sortedKey];
-    
-    const fixedKeys = Object.keys(XIANG_HE_FIXED);
-    for (let key of fixedKeys) {
-      if (sortedKey === key.split('').sort().join('')) {
-         if (a.includes(key.slice(0,2)) && b.includes(key.slice(2))) return XIANG_HE_FIXED[key];
-         if (b.includes(key.slice(0,2)) && a.includes(key.slice(2))) return XIANG_HE_FIXED[key];
-      }
-    }
-
-    const has = (x, y) => (a === x && b === y) || (a === y && b === x);
-    if (has('老阴','少阳')) return '老阳';
-    if (has('老阳','少阳')) return '少阴';
-    if (has('老阳','少阴')) return '老阴';
-    if (has('老阴','少阴')) return '少阳';
-
-    return '未定义';
-  }
-
-  function findBranchByAttrs(bian, xiang) {
-    const norm = v => v === '太阳' ? '老阳' : v === '太阴' ? '老阴' : v;
-    const target = norm(xiang);
-    return branches.find(b => branchAttrs[b].bian === bian && branchAttrs[b].xiang === target) || null;
-  }
-
-  function sanheOrder(centerBranch) {
-    const idx = branches.indexOf(centerBranch);
-    return [
-      branches[mod(idx - 4, 12)],
-      branches[idx],
-      branches[mod(idx + 4, 12)]
-    ];
-  }
-
-  function computeHe(dayIdx, hourIdx, dayYin) {
-    const dayB = branches[dayIdx];
-    const hourB = branches[hourIdx];
-    const dayAttr = branchAttrs[dayB];
-    const hourAttr = branchAttrs[hourB];
-
-    const heBian = bianCombine(dayAttr.bian, hourAttr.bian);
-    const heXiang = xiangCombine(dayAttr.xiang, hourAttr.xiang, dayYin);
-    const heBranch = findBranchByAttrs(heBian, heXiang);
-    const sanhe = heBranch ? sanheOrder(heBranch) : ['未定义', '未定义', '未定义'];
-
-    return { dayB, hourB, dayAttr, hourAttr, heBian, heXiang, heBranch, sanhe, dayYin };
-  }
-
-  function fmtXiang(v) {
-    if (v === '老阳') return '老阳（太阳）';
-    if (v === '老阴') return '老阴（太阴）';
-    return v;
-  }
-
-  // ===== C. 渲染区 =====
-  function renderHe(he) {
-    return `<table>
-      <thead><tr><th>项</th><th>日支（主）</th><th>时支（客）</th><th>合</th></tr></thead>
-      <tbody>
-        <tr><td>地支</td><td>${he.dayB}</td><td>${he.hourB}</td><td>${he.heBranch || '未定义'}</td></tr>
-        <tr><td>三变</td><td>${he.dayAttr.bian}</td><td>${he.hourAttr.bian}</td><td>${he.heBian}</td></tr>
-        <tr><td>四象</td><td>${fmtXiang(he.dayAttr.xiang)}</td><td>${fmtXiang(he.hourAttr.xiang)}</td><td>${fmtXiang(he.heXiang)}</td></tr>
-        <tr><td>日阴阳</td><td colspan="3">${he.dayYin}</td></tr>
-        <tr class="he-row"><td>合宫</td><td colspan="3"><b>${he.heBranch || '未定义'}</b> 宫</td></tr>
-        <tr class="he-row"><td>三合顺序</td><td colspan="3"><b>${he.sanhe.join(' → ')}</b></td></tr>
-      </tbody>
-    </table>`;
-  }
-
-  function polar(cx, cy, r, deg) {
-    const rad = deg * Math.PI / 180;
-    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
-  }
-
-  function sectorPath(cx, cy, r0, r1, a0, a1) {
-    const [x0, y0] = polar(cx, cy, r1, a0);
-    const [x1, y1] = polar(cx, cy, r1, a1);
-    const [x2, y2] = polar(cx, cy, r0, a1);
-    const [x3, y3] = polar(cx, cy, r0, a0);
-    return `M ${x0} ${y0} A ${r1} ${r1} 0 0 1 ${x1} ${y1} L ${x2} ${y2} A ${r0} ${r0} 0 0 0 ${x3} ${y3} Z`;
-  }
-
-  function renderSVG(windNames, hourNames, flowerNames, M, H0, H1, H2, d0, d1, d2) {
-    const W = 720, C = 360;
-
-    const rings = [
-      { r0: 70,  r1: 130, mid: 100, arr: branches,     font: 20, color: '#2f2a24', fillA: '#f8f1e3', fillB: '#fffaf0' },
-      { r0: 130, r1: 190, mid: 160, arr: windNames,    font: 15, color: '#7a3e2b', fillA: '#fbf0e4', fillB: '#fff8ef' },
-      { r0: 190, r1: 250, mid: 220, arr: hourNames,    font: 15, color: '#2f5d50', fillA: '#eef6f0', fillB: '#f8fcf8' },
-      { r0: 250, r1: 310, mid: 280, arr: flowerNames,  font: 15, color: '#7a2f5a', fillA: '#f8eef4', fillB: '#fff8fb' }
-    ];
-
-    let svg = `<svg viewBox="0 0 ${W} ${W}" xmlns="http://www.w3.org/2000/svg">`;
-    svg += `<circle cx="${C}" cy="${C}" r="340" fill="#fffdf7" stroke="#c8b89a" stroke-width="2"/>`;
-
-    rings.forEach(ring => {
-      for (let j = 0; j < 12; j++) {
-        const center = -90 + j * 30;
-        const fill = j % 2 === 0 ? ring.fillA : ring.fillB;
-        svg += `<path d="${sectorPath(C, C, ring.r0, ring.r1, center - 15, center + 15)}" fill="${fill}" />`;
-      }
-    });
-
-    [70, 130, 190, 250, 310].forEach(r => {
-      svg += `<circle cx="${C}" cy="${C}" r="${r}" fill="none" stroke="#c8b89a" stroke-width="1"/>`;
-    });
-
-    for (let k = 0; k < 12; k++) {
-      const ang = -105 + k * 30;
-      const [x1, y1] = polar(C, C, 70, ang);
-      const [x2, y2] = polar(C, C, 310, ang);
-      svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d8cbb6" stroke-width="1"/>`;
-    }
-
-    rings.forEach(ring => {
-      for (let i = 0; i < 12; i++) {
-        const ang = -90 + i * 30;
-        const [x, y] = polar(C, C, ring.mid, ang);
-        svg += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle"
-          font-size="${ring.font}" fill="${ring.color}"
-          font-family="Noto Serif SC, Songti SC, SimSun, serif">${ring.arr[i]}</text>`;
-      }
-    });
-
-    const [h0x, h0y] = polar(C, C, 100, -90 + H0 * 30);
-    svg += `<circle cx="${h0x}" cy="${h0y}" r="4" fill="#7a3e2b"/>`;
-    const [h1x, h1y] = polar(C, C, 160, -90 + H1 * 30);
-    svg += `<circle cx="${h1x}" cy="${h1y}" r="4" fill="#7a3e2b"/>`;
-    const [h2x, h2y] = polar(C, C, 220, -90 + H2 * 30);
-    svg += `<circle cx="${h2x}" cy="${h2y}" r="4" fill="#7a3e2b"/>`;
-
-    svg += `<circle cx="${C}" cy="${C}" r="52" fill="#f4ead6" stroke="#c8b89a" stroke-width="1"/>`;
-    svg += `<text x="${C}" y="${C - 14}" text-anchor="middle" dominant-baseline="middle"
-      font-size="13" fill="#2f2a24"
-      font-family="Noto Serif SC, Songti SC, SimSun, serif">月将 ${branches[M]}</text>`;
-    svg += `<text x="${C}" y="${C + 2}" text-anchor="middle" dominant-baseline="middle"
-      font-size="12" fill="#6d6254"
-      font-family="Noto Serif SC, Songti SC, SimSun, serif">风加 ${branches[H0]}·${d0 > 0 ? '顺' : '逆'}</text>`;
-    svg += `<text x="${C}" y="${C + 17}" text-anchor="middle" dominant-baseline="middle"
-      font-size="12" fill="#6d6254"
-      font-family="Noto Serif SC, Songti SC, SimSun, serif">候加 ${branches[H1]}·${d1 > 0 ? '顺' : '逆'}</text>`;
-    svg += `<text x="${C}" y="${C + 32}" text-anchor="middle" dominant-baseline="middle"
-      font-size="12" fill="#6d6254"
-      font-family="Noto Serif SC, Songti SC, SimSun, serif">花加 ${branches[H2]}·${d2 > 0 ? '顺' : '逆'}</text>`;
-
-    svg += `</svg>`;
-    return svg;
-  }
-
-  function renderTable(windNames, hourNames, flowerIndices, H0) {
-    const rows = branches.map((b, i) => {
-      const cls = i === H0 ? ' class="hour-row"' : '';
-      const flower = flowers[flowerIndices[i]];
-      return `<tr${cls}>
-        <td>${b}</td>
-        <td>${windNames[i]}</td>
-        <td>${hourNames[i]}</td>
-        <td>
-          <b>${flower.name}</b>（${flower.title}）
-          <span class="flower-detail">${flower.desc}</span>
-        </td>
-      </tr>`;
-    }).join('');
-
-    return `<table>
-      <thead><tr><th>内盘地支</th><th>十二风</th><th>十二候</th><th>十二花</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-  }
-
-  function renderPillarTable(windNames, hourNames, flowerIndices) {
-    const pillars = [
-      { name: '年支', idx: branches.indexOf(yearSelect.value) },
-      { name: '月支', idx: branches.indexOf(monthBranchSelect.value) },
-      { name: '日支', idx: branches.indexOf(daySelect.value) },
-      { name: '时支', idx: branches.indexOf(hourSelect.value) }
-    ];
-
-    const rows = pillars.map(p => {
-      const i = p.idx;
-      const cls = p.name === '时支' ? ' class="pillar-row hour-row"' : ' class="pillar-row"';
-      const flower = flowers[flowerIndices[i]];
-      return `<tr${cls}>
-        <td>${p.name}</td>
-        <td>${branches[i]}</td>
-        <td>${branches[i]}宫</td>
-        <td>${windNames[i]}</td>
-        <td>${hourNames[i]}</td>
-        <td>${flower.name}（${flower.title}）</td>
-      </tr>`;
-    }).join('');
-
-    return `<table>
-      <thead><tr><th>柱</th><th>地支</th><th>宫位</th><th>该宫风</th><th>该宫候</th><th>该宫花</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-  }
-
-  function render() {
-    const M = branches.indexOf(monthSelect.value);
-    const H0 = branches.indexOf(hourSelect.value);
-
-    const d0 = samePolarity(M, H0) ? 1 : -1;
-    const windLayer = buildLayer(M, H0, d0);
-    const H1 = findElementPosition(M, H0, d0, H0);
-
-    const d1 = samePolarity(M, H1) ? 1 : -1;
-    const hourLayer = buildLayer(M, H1, d1);
-    const H2 = findElementPosition(M, H1, d1, H0);
-
-    const d2 = samePolarity(M, H2) ? 1 : -1;
-    const flowerLayer = buildLayer(M, H2, d2);
-
-    const windNames = windLayer.map(i => winds[i]);
-    const hourNames = hourLayer.map(i => hours[i]);
-    const flowerNames = flowerLayer.map(i => flowers[i].name);
-
-    const dayIdx = branches.indexOf(daySelect.value);
-    const hourIdx = branches.indexOf(hourSelect.value);
-    const autoDayYin = isYang(dayIdx) ? '阳日' : '阴日';
-    const dayYin = dayYinSelect.value === 'auto' ? autoDayYin : dayYinSelect.value;
-    const he = computeHe(dayIdx, hourIdx, dayYin);
-
-    info.innerHTML = `
-      月将：<b>${branches[M]}</b>（风：${winds[M]}；候：${hours[M]}；花：${flowers[M].name}·${flowers[M].title}）　
-      占时支：<b>${branches[H0]}</b><br>
-      风盘：月将加内盘时支 <b>${branches[H0]}</b>，${isYang(M) ? '阳' : '阴'}对${isYang(H0) ? '阳' : '阴'}
-      → <b>${d0 > 0 ? '顺排' : '逆排'}</b>；风盘时支位落在 <b>${branches[H1]}</b> 宫。<br>
-      候盘：月将加风盘时支 <b>${branches[H1]}</b>，${isYang(M) ? '阳' : '阴'}对${isYang(H1) ? '阳' : '阴'}
-      → <b>${d1 > 0 ? '顺排' : '逆排'}</b>；候盘时支位落在 <b>${branches[H2]}</b> 宫。<br>
-      花盘：月将加候盘时支 <b>${branches[H2]}</b>，${isYang(M) ? '阳' : '阴'}对${isYang(H2) ? '阳' : '阴'}
-      → <b>${d2 > 0 ? '顺排' : '逆排'}</b>。<br>
-      主客：日支 <b>${branches[dayIdx]}</b>，时支 <b>${branches[hourIdx]}</b>；日阴阳：<b>${dayYin}</b>。
-    `;
-
-    chart.innerHTML = renderSVG(windNames, hourNames, flowerNames, M, H0, H1, H2, d0, d1, d2);
-    table.innerHTML = renderTable(windNames, hourNames, flowerLayer, H0);
-    pillarTable.innerHTML = renderPillarTable(windNames, hourNames, flowerLayer);
-    hegong.innerHTML = renderHe(he);
-  }
-
-  [monthSelect, yearSelect, monthBranchSelect, daySelect, hourSelect, dayYinSelect].forEach(el => {
-    el.addEventListener('change', render);
   });
+  const pts = [[100, H0], [160, H1], [220, H2]];
+  pts.forEach(([r, h]) => {
+    const [x, y] = polar(C, C, r, -90 + h * 30);
+    svg += `<circle cx="${x}" cy="${y}" r="4" fill="#7a3e2b"/>`;
+  });
+  svg += `<circle cx="${C}" cy="${C}" r="52" fill="#f4ead6" stroke="#c8b89a" stroke-width="1"/>`;
+  svg += `<text x="${C}" y="${C - 14}" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#2f2a24">月将 ${branches[M]}</text>`;
+  svg += `<text x="${C}" y="${C + 2}" text-anchor="middle" dominant-baseline="middle" font-size="12" fill="#6d6254">风加 ${branches[H0]}·${d0 > 0 ? '顺' : '逆'}</text>`;
+  svg += `<text x="${C}" y="${C + 17}" text-anchor="middle" dominant-baseline="middle" font-size="12" fill="#6d6254">候加 ${branches[H1]}·${d1 > 0 ? '顺' : '逆'}</text>`;
+  svg += `<text x="${C}" y="${C + 32}" text-anchor="middle" dominant-baseline="middle" font-size="12" fill="#6d6254">花加 ${branches[H2]}·${d2 > 0 ? '顺' : '逆'}</text>`;
+  return svg + `</svg>`;
+}
+function renderTable(windNames, hourNames, flowerIndices, H0) {
+  const rows = branches.map((b, i) => {
+    const flower = flowers[flowerIndices[i]];
+    return `<tr class="${i === H0 ? 'hour-row' : ''}">
+      <td>${b}</td><td>${windNames[i]}</td><td>${hourNames[i]}</td>
+      <td><b>${flower.name}</b>（${flower.title}）<span class="flower-detail">${flower.desc}</span></td>
+    </tr>`;
+  }).join('');
+  return `<table><thead><tr><th>地支</th><th>十二风</th><th>十二候</th><th>十二花</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function renderPillarTable(windNames, hourNames, flowerIndices) {
+  const pillars = [
+    { name: '年支', idx: branches.indexOf(fhYearSelect.value) },
+    { name: '月支', idx: branches.indexOf(fhMonthBranchSelect.value) },
+    { name: '日支', idx: branches.indexOf(fhDaySelect.value) },
+    { name: '时支', idx: branches.indexOf(fhHourSelect.value) }
+  ];
+  const rows = pillars.map(p => {
+    const i = p.idx; const flower = flowers[flowerIndices[i]];
+    return `<tr class="${p.name === '时支' ? 'hour-row' : ''}">
+      <td>${p.name}</td><td>${branches[i]}</td><td>${branches[i]}宫</td>
+      <td>${windNames[i]}</td><td>${hourNames[i]}</td><td>${flower.name}（${flower.title}）</td>
+    </tr>`;
+  }).join('');
+  return `<table><thead><tr><th>柱</th><th>地支</th><th>宫位</th><th>该宫风</th><th>该宫候</th><th>该宫花</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function renderFH() {
+  const M = branches.indexOf(fhMonthSelect.value);
+  const H0 = branches.indexOf(fhHourSelect.value);
+  const d0 = samePolarity(M, H0) ? 1 : -1;
+  const windLayer = buildLayer(M, H0, d0);
+  const H1 = findElementPosition(M, H0, d0, H0);
+  const d1 = samePolarity(M, H1) ? 1 : -1;
+  const hourLayer = buildLayer(M, H1, d1);
+  const H2 = findElementPosition(M, H1, d1, H0);
+  const d2 = samePolarity(M, H2) ? 1 : -1;
+  const flowerLayer = buildLayer(M, H2, d2);
+  const windNames = windLayer.map(i => winds[i]);
+  const hourNames = hourLayer.map(i => hours[i]);
+  const flowerNames = flowerLayer.map(i => flowers[i].name);
+  const dayIdx = branches.indexOf(fhDaySelect.value);
+  const hourIdx = branches.indexOf(fhHourSelect.value);
+  const dayYin = fhDayYinSelect.value === 'auto' ? (isYang(dayIdx) ? '阳日' : '阴日') : fhDayYinSelect.value;
+  const he = computeHe(dayIdx, hourIdx, dayYin);
+  
+  fhInfo.innerHTML = `
+    月将：<b>${branches[M]}</b>；占时支：<b>${branches[H0]}</b><br>
+    风盘：加于 <b>${branches[H0]}</b>，${d0 > 0 ? '顺排' : '逆排'}；候盘落 <b>${branches[H1]}</b> 宫；<br>
+    候盘：加于 <b>${branches[H1]}</b>，${d1 > 0 ? '顺排' : '逆排'}；花盘落 <b>${branches[H2]}</b> 宫；<br>
+    花盘：加于 <b>${branches[H2]}</b>，${d2 > 0 ? '顺排' : '逆排'}。<br>
+  `;
+  fhChart.innerHTML = renderSVG(windNames, hourNames, flowerNames, M, H0, H1, H2, d0, d1, d2);
+  fhTable.innerHTML = renderTable(windNames, hourNames, flowerLayer, H0);
+  fhPillarTable.innerHTML = renderPillarTable(windNames, hourNames, flowerLayer);
+  fhHegong.innerHTML = `<table>
+    <thead><tr><th>项</th><th>日支（主）</th><th>时支（客）</th><th>合</th></tr></thead>
+    <tbody>
+      <tr><td>地支</td><td>${he.dayB}</td><td>${he.hourB}</td><td>${he.heBranch || '未定义'}</td></tr>
+      <tr><td>三变</td><td>${he.dayAttr.bian}</td><td>${he.hourAttr.bian}</td><td>${he.heBian}</td></tr>
+      <tr><td>四象</td><td>${fmtXiang(he.dayAttr.xiang)}</td><td>${fmtXiang(he.hourAttr.xiang)}</td><td>${fmtXiang(he.heXiang)}</td></tr>
+      <tr><td>日阴阳</td><td colspan="3">${he.dayYin}</td></tr>
+      <tr class="he-row"><td>合宫</td><td colspan="3"><b>${he.heBranch || '未定义'}</b> 宫</td></tr>
+      <tr class="he-row"><td>三合</td><td colspan="3"><b>${he.sanhe.join(' → ')}</b></td></tr>
+    </tbody>
+  </table>`;
+}
+[fhMonthSelect, fhYearSelect, fhMonthBranchSelect, fhDaySelect, fhHourSelect, fhDayYinSelect].forEach(el => el.addEventListener('change', renderFH));
+renderFH();
 
-  render();
+
+// ==========================================
+// 天罡小六壬逻辑
+// ==========================================
+const tgMonth = document.getElementById('tg-month');
+const tgDayNum = document.getElementById('tg-day-num');
+const tgYearG = document.getElementById('tg-year-g'); const tgYearZ = document.getElementById('tg-year-z');
+const tgMonthG = document.getElementById('tg-month-g'); const tgMonthZ = document.getElementById('tg-month-z');
+const tgDayG = document.getElementById('tg-day-g'); const tgDayZ = document.getElementById('tg-day-z');
+const tgHourG = document.getElementById('tg-hour-g'); const tgHourZ = document.getElementById('tg-hour-z');
+
+for(let i=1; i<=12; i++) tgMonth.appendChild(new Option(`${i} 月`, i));
+for(let i=1; i<=30; i++) tgDayNum.appendChild(new Option(`${i} 日`, i));
+stems.forEach(s => { tgYearG.appendChild(new Option(s,s)); tgMonthG.appendChild(new Option(s,s)); tgDayG.appendChild(new Option(s,s)); tgHourG.appendChild(new Option(s,s)); });
+
+function updateBranches(ganSel, zhiSel, defaultZhi) {
+  const gan = ganSel.value;
+  const isYangGan = yangStems.includes(gan);
+  const allowedBranches = isYangGan ? yangBranches : yinBranches;
+  
+  const currentZhi = zhiSel.value;
+  zhiSel.innerHTML = '';
+  allowedBranches.forEach(b => zhiSel.appendChild(new Option(b, b)));
+  
+  if (allowedBranches.includes(currentZhi)) {
+    zhiSel.value = currentZhi;
+  } else {
+    zhiSel.value = defaultZhi || allowedBranches[0];
+  }
+}
+
+tgYearG.addEventListener('change', () => updateBranches(tgYearG, tgYearZ, '午'));
+tgMonthG.addEventListener('change', () => updateBranches(tgMonthG, tgMonthZ, '戌'));
+tgDayG.addEventListener('change', () => updateBranches(tgDayG, tgDayZ, '酉'));
+tgHourG.addEventListener('change', () => updateBranches(tgHourG, tgHourZ, '寅'));
+
+// 填入初始默认值（丙午 戊戌 癸酉 甲寅，九月十七）
+tgMonth.value = 9;
+tgDayNum.value = 17;
+tgYearG.value = '丙'; updateBranches(tgYearG, tgYearZ, '午');
+tgMonthG.value = '戊'; updateBranches(tgMonthG, tgMonthZ, '戌');
+tgDayG.value = '癸'; updateBranches(tgDayG, tgDayZ, '酉');
+tgHourG.value = '甲'; updateBranches(tgHourG, tgHourZ, '寅');
+
+// 北斗位置口诀映射
+const douMapping = {
+  1: '丑', 2: '子', 3: '亥', 4: '戌', 5: '酉', 6: '戌',
+  7: '亥', 8: '子', 9: '丑', 10: '寅', 11: '卯', 12: '寅'
+};
+
+// 计算日柱旬空
+function getXunKong(dayG, dayZ) {
+  const ganIdx = stems.indexOf(dayG);
+  const zhiIdx = branches.indexOf(dayZ);
+  let index = 0;
+  for(let i=0; i<60; i++) {
+    if (i % 10 === ganIdx && i % 12 === zhiIdx) { index = i; break; }
+  }
+  const xunKongTable = [
+    ['戌','亥'], ['申','酉'], ['午','未'], ['辰','巳'], ['寅','卯'], ['子','丑']
+  ];
+  const xun = Math.floor(index / 10);
+  return xunKongTable[xun];
+}
+
+function calcTiangang() {
+  const m = parseInt(tgMonth.value);
+  const dayNum = parseInt(tgDayNum.value);
+  const yearZ = tgYearZ.value;
+  const dayG = tgDayG.value;
+  const dayZ = tgDayZ.value;
+  const hourZ = tgHourZ.value;
+  
+  // 1. 定北斗
+  let normalDou = douMapping[m];
+  let baseZhi = normalDou;
+  let isChong = (m >= 6 && m <= 10);
+  if (isChong) {
+    const idx = branches.indexOf(normalDou);
+    baseZhi = branches[(idx + 6) % 12];
+  }
+  
+  // 2. 起日：以北斗所在起初一，顺数至农历日
+  const baseZhiIdx = branches.indexOf(baseZhi);
+  const dayLandIdx = (baseZhiIdx + (dayNum - 1)) % 12;
+  const dayLandZhi = branches[dayLandIdx];
+  
+  // 3. 日上从子起至占时
+  const hourZhiIdx = branches.indexOf(hourZ);
+  const hourLandIdx = (dayLandIdx + hourZhiIdx) % 12;
+  const hourLandZhi = branches[hourLandIdx];
+  
+  // 4. 时上从子起至占年
+  const yearZhiIdx = branches.indexOf(yearZ);
+  const yearLandIdx = (hourLandIdx + yearZhiIdx) % 12;
+  const yearLandZhi = branches[yearLandIdx];
+  
+  // 5. 旬空
+  const xunKong = getXunKong(dayG, dayZ);
+
+  // 6. 渲染信息
+  const tgInfo = document.getElementById('tg-info');
+  tgInfo.innerHTML = `
+    <b>四柱：</b>${tgYearG.value}${yearZ} ${tgMonthG.value}${tgMonthZ.value} ${dayG}${dayZ}（旬空：${xunKong.join('、')}） ${tgHourG.value}${hourZ}<br>
+    <b>北斗所在：</b>${baseZhi}
+  `;
+  
+  // 7. 渲染步骤
+  const tgSteps = document.getElementById('tg-steps');
+  tgSteps.innerHTML = `
+    1. <b>定北斗：</b>${m}月北斗在 <span>${baseZhi}</span> 宫。<br>
+    2. <b>起日顺日：</b>在 <span>${baseZhi}</span> 宫起初一，顺数至 ${dayNum} 日，落于 <span>${dayLandZhi}</span> 宫。<br>
+    3. <b>日上起时：</b>在 <span>${dayLandZhi}</span> 宫起子，顺数至占时 <span>${hourZ}</span>（${hourZhiIdx + 1}位），落于 <span>${hourLandZhi}</span> 宫。<br>
+    4. <b>时上起年：</b>在 <span>${hourLandZhi}</span> 宫起子，顺数至占年 <span>${yearZ}</span>（${yearZhiIdx + 1}位），落于 <span>${yearLandZhi}</span> 宫。<br>
+    5. <b>得局：</b>结合四柱，卦局成。
+  `;
+  
+  // 8. 渲染十字盘
+  const tgBoard = document.getElementById('tg-board');
+  
+  tgBoard.innerHTML = `
+    <div class="tg-pillars-display">
+      <span>${tgYearG.value}${yearZ}</span>
+      <span>${tgMonthG.value}${tgMonthZ.value}</span>
+      <span>${dayG}${dayZ} <span class="xunkong">(空:${xunKong.join('、')})</span></span>
+      <span>${tgHourG.value}${hourZ}</span>
+    </div>
+    
+    <div class="square-grid">
+      <!-- 隐形底盘 -->
+      <div class="ground-bg">
+        <div class="ground-cross"></div>
+        <div class="ground-cross vertical"></div>
+      </div>
+
+      <div class="cell empty"></div>
+      <!-- 上：起日(北斗) -->
+      <div class="cell">${baseZhi}<span class="cell-sub">起日</span></div>
+      <div class="cell empty"></div>
+      
+      <!-- 左：日落 -->
+      <div class="cell">${dayLandZhi}<span class="cell-sub">日落</span></div>
+      <div class="cell center">天罡定局</div>
+      <!-- 右：时落 -->
+      <div class="cell">${hourLandZhi}<span class="cell-sub">时落</span></div>
+      
+      <div class="cell empty"></div>
+      <!-- 下：年落 -->
+      <div class="cell">${yearLandZhi}<span class="cell-sub">年落</span></div>
+      <div class="cell empty"></div>
+    </div>
+    <div class="note">
+      （地盘：左卯右酉，上午下子）
+    </div>
+  `;
+}
+
+document.getElementById('tg-calc-btn').addEventListener('click', calcTiangang);
+calcTiangang();
+
 </script>
 </body>
 </html>
