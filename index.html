@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>术数排盘平台</title>
+<!-- 引入轻量级农历/八字库，用于精准获取当前时间 -->
+<script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.6.12/lunar.js"></script>
 <style>
   :root {
     --paper: #fffdf7;
@@ -61,6 +63,8 @@
   }
   .action-btn { background: #f4ead6; cursor: pointer; padding: 8px 16px; font-weight: 600; color: var(--primary); border: 1px solid var(--line); }
   .action-btn:hover { background: #eadcc2; }
+  .now-btn { background: #7a3e2b; color: #fff; border: none; }
+  .now-btn:hover { background: #5c2e20; }
 
   .info-box {
     background: var(--paper); border: 1px solid var(--line);
@@ -82,11 +86,13 @@
   .hour-row td { background: #fbf0dc; font-weight: 600; }
   .he-row td { background: #f8eef4; }
 
-  .tg-inputs { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; background: var(--paper); padding: 16px; border-radius: 12px; border: 1px solid var(--line); }
+  .tg-inputs { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; background: var(--paper); padding: 16px; border-radius: 12px; border: 1px solid var(--line); align-items: flex-end; }
   .pillar-select { display: flex; flex-direction: column; gap: 6px; }
   .pillar-select div { display: flex; gap: 4px; }
+  
   .step-text { font-size: 14px; line-height: 2; margin-bottom: 16px; }
   .step-text span { color: var(--primary); font-weight: bold; }
+  
   .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   @media (max-width: 768px) { .result-grid { grid-template-columns: 1fr; } }
   
@@ -95,11 +101,11 @@
     background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 30px;
   }
   .tg-pillars-display {
-    font-size: 18px; letter-spacing: 2px; margin-bottom: 30px; padding-bottom: 10px;
+    font-size: 18px; letter-spacing: 2px; margin-bottom: 20px; padding-bottom: 10px;
     border-bottom: 1px dashed var(--line); text-align: center; width: 100%;
   }
   .tg-pillars-display span { margin: 0 8px; }
-  .tg-pillars-display .xunkong { font-size: 14px; color: var(--muted); }
+  .tg-pillars-display .xunkong { font-size: 14px; color: #d9534f; font-weight: bold; }
   
   .square-grid { 
     display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; 
@@ -118,16 +124,17 @@
   .cell.empty { visibility: hidden; }
   .cell.center { font-size: 14px; color: var(--muted); text-align: center; line-height: 1.4; background: var(--paper); z-index: 2;}
   .cell-sub { font-size: 12px; color: var(--muted); font-weight: normal; margin-top: 4px; }
-  
-  /* 神煞展示区 */
-  .shensha-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 20px; }
-  .shensha-card { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12px; }
-  .shensha-card .zhi { font-size: 18px; font-weight: bold; color: var(--primary); border-bottom: 1px dashed var(--line); padding-bottom: 6px; margin-bottom: 6px; text-align: center; }
+
+  details { margin-top: 20px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  summary { cursor: pointer; font-weight: bold; color: var(--primary); padding: 5px; outline: none; }
+  .shensha-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 15px; }
+  .shensha-card { background: #f3eee4; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 12px; }
+  .shensha-card .zhi { font-size: 16px; font-weight: bold; color: var(--primary); border-bottom: 1px dashed var(--line); padding-bottom: 4px; margin-bottom: 4px; text-align: center; }
   .shensha-card .tag-group { display: flex; flex-wrap: wrap; gap: 4px; }
-  .shensha-card .tag { background: #f4ead6; padding: 2px 4px; border-radius: 4px; color: var(--ink); }
+  .shensha-card .tag { background: #fff; padding: 2px 4px; border-radius: 4px; color: var(--ink); }
   .shensha-card .tag.cs { background: #eef6f0; color: #2f5d50; }
   .shensha-card .tag.sha { background: #f8eef4; color: #7a2f5a; }
-  
+
   .note { color: var(--muted); font-size: 12px; line-height: 1.8; margin-top: 10px; text-align: center; }
   .flower-detail { font-size: 12px; color: var(--muted); display: block; margin-top: 2px;}
 </style>
@@ -148,10 +155,12 @@
   </div>
 </div>
 
+<!-- ================= 风候花星模块 ================= -->
 <div id="fenghou-view" class="app">
   <div class="header">
     <button class="back-btn" onclick="switchView('menu')">← 返回主页</button>
     <h1>风候花星 排盘</h1>
+    <button class="action-btn now-btn" onclick="loadFHCurrentTime()" style="margin-left:auto;">⏱ 读取当前时间</button>
   </div>
   <div class="controls">
     <label>月将：<select id="fh-month"></select></label>
@@ -179,10 +188,12 @@
   </div>
 </div>
 
+<!-- ================= 天罡小六壬模块 ================= -->
 <div id="tiangang-view" class="app">
   <div class="header">
     <button class="back-btn" onclick="switchView('menu')">← 返回主页</button>
     <h1>天罡小六壬</h1>
+    <button class="action-btn now-btn" onclick="loadTGCurrentTime()" style="margin-left:auto;">⏱ 读取当前时间</button>
   </div>
   
   <div class="tg-inputs">
@@ -210,7 +221,7 @@
       <span>时柱</span>
       <div><select id="tg-hour-g"></select><select id="tg-hour-z"></select></div>
     </div>
-    <button class="action-btn" id="tg-calc-btn" style="margin-top: 20px;">起局排盘</button>
+    <button class="action-btn" id="tg-calc-btn">起局排盘</button>
   </div>
 
   <div class="info-box" id="tg-info"></div>
@@ -226,9 +237,10 @@
     </div>
   </div>
 
-  <!-- 神煞与长生展示区 -->
-  <h2 style="margin-top: 30px;">十二宫神煞与长生</h2>
-  <div class="shensha-grid" id="tg-shensha-grid"></div>
+  <details>
+    <summary>展开/收起：十二宫辅助信息（神煞与十二长生）</summary>
+    <div class="shensha-grid" id="tg-shensha-grid"></div>
+  </details>
 </div>
 
 <script>
@@ -255,7 +267,7 @@ const yangBranches = ['子','寅','辰','午','申','戌'];
 const yinBranches = ['丑','卯','巳','未','酉','亥'];
 
 // ==========================================
-// 风候花星逻辑 (保持不变)
+// 风候花星逻辑
 // ==========================================
 const winds = ['伏藏风','德育风','条达风','高丛风','雷鸣风','粉面风','阳竟风','论刑风','不周风','沉夺风','凋零风','亡杀风'];
 const hours = ['泉涌','乡巢','冰融','桃华','虹见','麦熟','角解','鹰挚','祭鸟','养羞','黄落','地冻'];
@@ -310,6 +322,36 @@ branches.forEach((b, i) => {
   fhHourSelect.appendChild(new Option(b, b));
 });
 fhMonthSelect.value = '子'; fhYearSelect.value = '子'; fhMonthBranchSelect.value = '丑'; fhDaySelect.value = '寅'; fhHourSelect.value = '卯';
+
+function loadFHCurrentTime() {
+  if (typeof Lunar === 'undefined') {
+    alert("农历库尚未加载完成，请稍后再试。");
+    return;
+  }
+  const now = new Date();
+  const lunar = Lunar.fromDate(now);
+  const ec = lunar.getEightChar();
+  
+  const yZhi = ec.getYear()[1];
+  const mZhi = ec.getMonth()[1];
+  const dZhi = ec.getDay()[1];
+  const hZhi = ec.getTime()[1];
+  
+  fhYearSelect.value = yZhi;
+  fhMonthBranchSelect.value = mZhi;
+  fhDaySelect.value = dZhi;
+  fhHourSelect.value = hZhi;
+  fhDayYinSelect.value = 'auto';
+  
+  const yueJiangMap = {
+    '寅': '亥', '卯': '戌', '辰': '酉', '巳': '申',
+    '午': '未', '未': '午', '申': '巳', '酉': '辰',
+    '戌': '卯', '亥': '寅', '子': '丑', '丑': '子'
+  };
+  fhMonthSelect.value = yueJiangMap[mZhi];
+  
+  renderFH();
+}
 
 function buildLayer(M, target, d) {
   const arr = Array(12);
@@ -468,7 +510,8 @@ function renderFH() {
   </table>`;
 }
 [fhMonthSelect, fhYearSelect, fhMonthBranchSelect, fhDaySelect, fhHourSelect, fhDayYinSelect].forEach(el => el.addEventListener('change', renderFH));
-renderFH();
+
+setTimeout(() => { loadFHCurrentTime(); loadTGCurrentTime(); }, 500);
 
 
 // ==========================================
@@ -507,12 +550,35 @@ tgMonthG.addEventListener('change', () => updateBranches(tgMonthG, tgMonthZ, '�
 tgDayG.addEventListener('change', () => updateBranches(tgDayG, tgDayZ, '酉'));
 tgHourG.addEventListener('change', () => updateBranches(tgHourG, tgHourZ, '寅'));
 
-tgMonth.value = 9;
-tgDayNum.value = 17;
-tgYearG.value = '丙'; updateBranches(tgYearG, tgYearZ, '午');
-tgMonthG.value = '戊'; updateBranches(tgMonthG, tgMonthZ, '戌');
-tgDayG.value = '癸'; updateBranches(tgDayG, tgDayZ, '酉');
-tgHourG.value = '甲'; updateBranches(tgHourG, tgHourZ, '寅');
+function loadTGCurrentTime() {
+  if (typeof Lunar === 'undefined') {
+    alert("农历库尚未加载完成，请稍后再试。");
+    return;
+  }
+  
+  const now = new Date();
+  const lunar = Lunar.fromDate(now);
+  
+  const lMonth = Math.abs(lunar.getMonth());
+  const lDay = lunar.getDay();
+  tgMonth.value = lMonth;
+  tgDayNum.value = lDay;
+  
+  const ec = lunar.getEightChar();
+  const pillars = [ec.getYear(), ec.getMonth(), ec.getDay(), ec.getTime()];
+  const gzList = [tgYearG, tgMonthG, tgDayG, tgHourG];
+  const zhiList = [tgYearZ, tgMonthZ, tgDayZ, tgHourZ];
+  
+  pillars.forEach((p, idx) => {
+    const g = p[0];
+    const z = p[1];
+    gzList[idx].value = g;
+    updateBranches(gzList[idx], zhiList[idx], z); 
+    zhiList[idx].value = z; 
+  });
+  
+  calcTiangang();
+}
 
 const douMapping = {
   1: '丑', 2: '子', 3: '亥', 4: '戌', 5: '酉', 6: '戌',
@@ -532,28 +598,14 @@ function getXunKong(dayG, dayZ) {
   return xunKongTable[Math.floor(index / 10)];
 }
 
-// 十二长生序列（顺排）
 const changshengList = ['长生','沐浴','冠带','临官','帝旺','衰','病','死','墓','绝','胎','养'];
-
-// 计算天干十二长生（基于长生位顺排）
 function getChangsheng(startZhiIdx) {
   const res = {};
-  for (let i = 0; i < 12; i++) {
-    res[branches[(startZhiIdx + i) % 12]] = changshengList[i];
-  }
+  for (let i = 0; i < 12; i++) res[branches[(startZhiIdx + i) % 12]] = changshengList[i];
   return res;
 }
-
-// 天干长生起位（按用户：甲亥、乙午、丙戊寅、丁己酉、庚巳、辛子、壬申、癸卯）
-const csStartMap = {
-  '甲': 11, '乙': 6, '丙': 2, '丁': 9, '戊': 2,
-  '己': 9, '庚': 5, '辛': 0, '壬': 8, '癸': 3
-};
-
-// 六十甲子纳音（30个）
+const csStartMap = { '甲': 11, '乙': 6, '丙': 2, '丁': 9, '戊': 2, '己': 9, '庚': 5, '辛': 0, '壬': 8, '癸': 3 };
 const nayinWuxing = ['金','火','木','土','金','火','水','土','金','木','水','土','火','木','水','金','火','木','水','金','土','火','木','土','金','火','木','水','土','金'];
-
-// 五行长生起位
 const wuxingCsStart = { '金': 5, '木': 11, '水': 8, '火': 2, '土': 8 };
 
 function calcTiangang() {
@@ -573,51 +625,36 @@ function calcTiangang() {
   const dIdx = branches.indexOf(dayZ);
   const hIdx = branches.indexOf(hourZ);
   
-  // 1. 定北斗
   let normalDou = douMapping[m];
   let baseZhi = normalDou;
   let isChong = (m >= 6 && m <= 10);
-  if (isChong) {
-    const idx = branches.indexOf(normalDou);
-    baseZhi = branches[(idx + 6) % 12];
-  }
+  if (isChong) baseZhi = branches[(branches.indexOf(normalDou) + 6) % 12];
   
-  // 2. 起日顺日
   const baseZhiIdx = branches.indexOf(baseZhi);
   const dayLandIdx = (baseZhiIdx + (dayNum - 1)) % 12;
   const dayLandZhi = branches[dayLandIdx];
-  
-  // 3. 日上起时
-  const hourZhiIdx = branches.indexOf(hourZ);
-  const hourLandIdx = (dayLandIdx + hourZhiIdx) % 12;
+  const hourLandIdx = (dayLandIdx + hIdx) % 12;
   const hourLandZhi = branches[hourLandIdx];
-  
-  // 4. 时上起年
-  const yearZhiIdx = branches.indexOf(yearZ);
-  const yearLandIdx = (hourLandIdx + yearZhiIdx) % 12;
+  const yearLandIdx = (hourLandIdx + yIdx) % 12;
   const yearLandZhi = branches[yearLandIdx];
   
-  // 5. 旬空
   const xunKong = getXunKong(dayG, dayZ);
 
-  // 6. 渲染基本信息
   const tgInfo = document.getElementById('tg-info');
   tgInfo.innerHTML = `
-    <b>四柱：</b>${yearG}${yearZ} ${monthG}${monthZ} ${dayG}${dayZ}（旬空：${xunKong.join('、')}） ${hourG}${hourZ}<br>
+    <b>四柱：</b>${yearG}${yearZ} ${monthG}${monthZ} ${dayG}${dayZ}（旬空：<span style="color:#d9534f">${xunKong.join('、')}</span>） ${hourG}${hourZ}<br>
     <b>北斗所在：</b>${baseZhi}
   `;
   
-  // 7. 渲染步骤
   const tgSteps = document.getElementById('tg-steps');
   tgSteps.innerHTML = `
     1. <b>定北斗：</b>${m}月北斗在 <span>${baseZhi}</span> 宫。<br>
     2. <b>起日顺日：</b>在 <span>${baseZhi}</span> 宫起初一，顺数至 ${dayNum} 日，落于 <span>${dayLandZhi}</span> 宫。<br>
-    3. <b>日上起时：</b>在 <span>${dayLandZhi}</span> 宫起子，顺数至占时 <span>${hourZ}</span>（${hourZhiIdx + 1}位），落于 <span>${hourLandZhi}</span> 宫。<br>
-    4. <b>时上起年：</b>在 <span>${hourLandZhi}</span> 宫起子，顺数至占年 <span>${yearZ}</span>（${yearZhiIdx + 1}位），落于 <span>${yearLandZhi}</span> 宫。<br>
-    5. <b>得局：</b>结合四柱，卦局成。
+    3. <b>日上起时：</b>在 <span>${dayLandZhi}</span> 宫起子，顺数至占时 <span>${hourZ}</span>（${hIdx + 1}位），落于 <span>${hourLandZhi}</span> 宫。<br>
+    4. <b>时上起年：</b>在 <span>${hourLandZhi}</span> 宫起子，顺数至占年 <span>${yearZ}</span>（${yIdx + 1}位），落于 <span>${yearLandZhi}</span> 宫。<br>
   `;
-  
-  // 8. 渲染十字盘
+
+  // ======= 删除了气机关系模块，还原干净的四正盘 =======
   const tgBoard = document.getElementById('tg-board');
   tgBoard.innerHTML = `
     <div class="tg-pillars-display">
@@ -644,18 +681,13 @@ function calcTiangang() {
     <div class="note">（地盘：左卯右酉，上午下子）</div>
   `;
 
-  // 9. 计算神煞与长生
   const shenshaData = {};
   branches.forEach(b => shenshaData[b] = []);
-
-  // 9.1 日干十二长生 (全顺排)
+  
   const dsStart = csStartMap[dayG];
   const dsMap = getChangsheng(dsStart);
-  for (let b in dsMap) {
-    shenshaData[b].push({ name: `日干${dsMap[b]}`, type: 'cs' });
-  }
+  for (let b in dsMap) shenshaData[b].push({ name: `日干${dsMap[b]}`, type: 'cs' });
 
-  // 9.2 年支三合煞
   const sanheMap = {
     '申子辰': { cs: 8, lin: 11, jue: 5, bing: 2, mu: 4, wang: 0, si: 3 },
     '寅午戌': { cs: 2, lin: 5, jue: 11, bing: 8, mu: 10, wang: 6, si: 9 },
@@ -673,14 +705,13 @@ function calcTiangang() {
     shenshaData[branches[info.lin]].push({ name: '亡神', type: 'sha' });
     shenshaData[branches[info.jue]].push({ name: '劫杀', type: 'sha' });
     shenshaData[branches[info.bing]].push({ name: '驿马', type: 'sha' });
-    shenshaData[branches[info.cs + 1]].push({ name: '咸池', type: 'sha' }); // 沐浴是长生+1
+    shenshaData[branches[info.cs + 1]].push({ name: '咸池', type: 'sha' }); 
     shenshaData[branches[info.mu]].push({ name: '华盖', type: 'sha' });
     shenshaData[branches[info.wang]].push({ name: '将星', type: 'sha' });
     shenshaData[branches[info.si]].push({ name: '六厄', type: 'sha' });
     shenshaData[branches[(info.wang + 6) % 12]].push({ name: '灾煞', type: 'sha' });
   }
 
-  // 9.3 孤辰寡宿
   let guChen, guaSu;
   if (['亥','子','丑'].includes(yearZ)) { guChen = '寅'; guaSu = '戌'; }
   else if (['寅','卯','辰'].includes(yearZ)) { guChen = '巳'; guaSu = '丑'; }
@@ -689,82 +720,56 @@ function calcTiangang() {
   if (guChen) shenshaData[guChen].push({ name: '孤辰', type: 'sha' });
   if (guaSu) shenshaData[guaSu].push({ name: '寡宿', type: 'sha' });
 
-  // 9.4 天干十二长生煞 (基于年干)
   const ysStart = csStartMap[yearG];
   shenshaData[branches[ysStart]].push({ name: '学堂(年)', type: 'cs' });
   shenshaData[branches[(ysStart + 4) % 12]].push({ name: '羊刃(年)', type: 'sha' });
   shenshaData[branches[(ysStart + 4 + 6) % 12]].push({ name: '飞刃(年)', type: 'sha' });
   shenshaData[branches[(ysStart + 3) % 12]].push({ name: '禄勋(年)', type: 'cs' });
 
-  // 9.5 天乙贵人 (基于年干)
   const tyMap = {
-    '甲':['丑','未'], '戊':['丑','未'], '庚':['丑','未'],
-    '乙':['子','申'], '己':['子','申'],
-    '丙':['亥','酉'], '丁':['亥','酉'],
-    '壬':['卯','巳'], '癸':['卯','巳'],
-    '辛':['午','寅']
+    '甲':['丑','未'], '戊':['丑','未'], '庚':['丑','未'], '乙':['子','申'], '己':['子','申'],
+    '丙':['亥','酉'], '丁':['亥','酉'], '壬':['卯','巳'], '癸':['卯','巳'], '辛':['午','寅']
   };
   tyMap[yearG].forEach(b => shenshaData[b].push({ name: '天乙', type: 'cs' }));
 
-  // 9.6 文昌 (基于年干)
   const wcMap = { '甲':'巳', '乙':'午', '丙':'巳', '丁':'午', '戊':'申', '己':'酉', '庚':'亥', '辛':'子', '壬':'寅', '癸':'卯' };
   shenshaData[wcMap[yearG]].push({ name: '文昌', type: 'cs' });
 
-  // 9.7 天官贵人 (基于年干)
   const tgMap = { '甲':'未', '乙':'辰', '丙':'巳', '丁':'寅', '戊':'丑', '己':'戌', '庚':'亥', '辛':'申', '壬':'酉', '癸':'午' };
   shenshaData[tgMap[yearG]].push({ name: '天官', type: 'cs' });
 
-  // 9.8 天贵 (基于年干)
   const tguMap = { '甲':'酉', '乙':'申', '丙':'子', '丁':'亥', '戊':'卯', '己':'寅', '庚':'午', '辛':'巳', '壬':'午', '癸':'巳' };
   shenshaData[tguMap[yearG]].push({ name: '天贵', type: 'cs' });
 
-  // 9.9 斗构 (以戌时加月建，顺数到时支)
-  // 月建 = mIdx, 起点 = 戌(10), 落点 = 时支(hIdx)
-  // 偏移 = (hIdx - 10 + 12) % 12
   const douGouIdx = (mIdx + (hIdx - 10 + 12) % 12) % 12;
   shenshaData[branches[douGouIdx]].push({ name: '斗构', type: 'cs' });
 
-  // 9.10 红鸾天喜 (基于年支)
   const hongLuanIdx = (3 - yIdx + 12) % 12;
   shenshaData[branches[hongLuanIdx]].push({ name: '红鸾', type: 'cs' });
   shenshaData[branches[(hongLuanIdx + 6) % 12]].push({ name: '天喜', type: 'cs' });
 
-  // 9.11 破碎 (基于年支)
-  let poSui;
+  let poSui = '丑';
   if (['寅','申','巳','亥'].includes(yearZ)) poSui = '酉';
   else if (['子','午','卯','酉'].includes(yearZ)) poSui = '巳';
-  else poSui = '丑';
   shenshaData[poSui].push({ name: '破碎', type: 'sha' });
 
-  // 9.12 国印 (基于年干)
   const gyMap = { '甲':'戌', '乙':'亥', '丙':'丑', '丁':'寅', '戊':'丑', '己':'寅', '庚':'辰', '辛':'巳', '壬':'未', '癸':'申' };
   shenshaData[gyMap[yearG]].push({ name: '国印', type: 'cs' });
 
-  // 9.13 岁煞 (基于年支)
   shenshaData[branches[(yIdx + 2) % 12]].push({ name: '天雄', type: 'sha' });
   shenshaData[branches[(yIdx + 8) % 12]].push({ name: '地雌', type: 'sha' });
   shenshaData[branches[(yIdx + 4) % 12]].push({ name: '年符', type: 'sha' });
   shenshaData[branches[(yIdx + 5) % 12]].push({ name: '小耗', type: 'sha' });
   shenshaData[branches[(yIdx + 6) % 12]].push({ name: '大耗', type: 'sha' });
 
-  // 9.14 年柱纳音十二长生
-  // 计算六十甲子索引
   let gzIndex = 0;
-  for(let i=0; i<60; i++) {
-    if (i % 10 === stems.indexOf(yearG) && i % 12 === yIdx) { gzIndex = i; break; }
-  }
-  const nayinIdx = Math.floor(gzIndex / 2);
-  const nayin = nayinWuxing[nayinIdx];
-  const nyStart = wuxingCsStart[nayin];
-  const nyMap = getChangsheng(nyStart);
-  for (let b in nyMap) {
-    shenshaData[b].push({ name: `纳音${nyMap[b]}`, type: 'cs' });
-  }
+  for(let i=0; i<60; i++) if (i % 10 === stems.indexOf(yearG) && i % 12 === yIdx) { gzIndex = i; break; }
+  const nayin = nayinWuxing[Math.floor(gzIndex / 2)];
+  const nyMap = getChangsheng(wuxingCsStart[nayin]);
+  for (let b in nyMap) shenshaData[b].push({ name: `纳音${nyMap[b]}`, type: 'cs' });
 
-  // 渲染神煞网格
   tgShenshaGrid.innerHTML = branches.map(b => {
     const list = shenshaData[b];
-    // 去重
     const uniqueList = Array.from(new Set(list.map(item => JSON.stringify(item)))).map(item => JSON.parse(item));
     const tags = uniqueList.map(item => `<span class="tag ${item.type}">${item.name}</span>`).join('');
     return `<div class="shensha-card">
@@ -775,8 +780,6 @@ function calcTiangang() {
 }
 
 document.getElementById('tg-calc-btn').addEventListener('click', calcTiangang);
-calcTiangang();
-
 </script>
 </body>
 </html>
