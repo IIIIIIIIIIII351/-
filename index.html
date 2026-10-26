@@ -107,43 +107,23 @@
   .tg-pillars-display span { margin: 0 8px; }
   .tg-pillars-display .xunkong { font-size: 14px; color: #d9534f; font-weight: bold; }
   
-  /* 十字盘布局与连线 */
   .square-grid { 
     display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; 
-    width: 300px; height: 300px; gap: 4px; position: relative;
+    width: 260px; height: 260px; gap: 6px; position: relative;
   }
   .ground-bg {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     display: flex; align-items: center; justify-content: center; pointer-events: none;
   }
-  /* 地盘十字暗线 */
-  .ground-cross { position: absolute; width: 100%; height: 1px; background: var(--line); opacity: 0.5;}
+  .ground-cross { position: absolute; width: 100%; height: 1px; background: var(--line); }
   .ground-cross.vertical { width: 1px; height: 100%; }
-
   .cell { 
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-size: 32px; color: var(--primary); font-weight: bold; z-index: 2; position: relative;
+    font-size: 28px; color: var(--primary); font-weight: bold; z-index: 1; position: relative;
   }
   .cell.empty { visibility: hidden; }
   .cell.center { font-size: 14px; color: var(--muted); text-align: center; line-height: 1.4; background: var(--paper); z-index: 2;}
   .cell-sub { font-size: 12px; color: var(--muted); font-weight: normal; margin-top: 4px; }
-
-  /* 相邻与对位的连线标记 */
-  .relation-tag {
-    position: absolute; z-index: 3; font-size: 14px; font-weight: bold; 
-    padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.9);
-  }
-  .rel-chong { color: #d9534f; border: 1px solid #d9534f; }
-  .rel-he { color: #2f5d50; border: 1px solid #2f5d50; }
-  .rel-xing { color: #7a2f5a; border: 1px dashed #7a2f5a; }
-
-  /* 标记在四个边的中间 */
-  .tag-top-bottom { top: 50%; left: 50%; transform: translate(-50%, -50%); }
-  .tag-top-left { top: 25%; left: 25%; transform: translate(-50%, -50%); }
-  .tag-top-right { top: 25%; left: 75%; transform: translate(-50%, -50%); }
-  .tag-bottom-left { top: 75%; left: 25%; transform: translate(-50%, -50%); }
-  .tag-bottom-right { top: 75%; left: 75%; transform: translate(-50%, -50%); }
-  .tag-left-right { top: 50%; left: 50%; transform: translate(-50%, -50%); margin-top: -20px; }
 
   details { margin-top: 20px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
   summary { cursor: pointer; font-weight: bold; color: var(--primary); padding: 5px; outline: none; }
@@ -521,4 +501,380 @@ function renderFH() {
     <thead><tr><th>项</th><th>日支（主）</th><th>时支（客）</th><th>合</th></tr></thead>
     <tbody>
       <tr><td>地支</td><td>${he.dayB}</td><td>${he.hourB}</td><td>${he.heBranch || '未定义'}</td></tr>
-      <tr><td>三变</td><td>${he.dayAttr.bian}</td><td>${he.hourAttr.bian}</td><
+      <tr><td>三变</td><td>${he.dayAttr.bian}</td><td>${he.hourAttr.bian}</td><td>${he.heBian}</td></tr>
+      <tr><td>四象</td><td>${fmtXiang(he.dayAttr.xiang)}</td><td>${fmtXiang(he.hourAttr.xiang)}</td><td>${fmtXiang(he.heXiang)}</td></tr>
+      <tr><td>日阴阳</td><td colspan="3">${he.dayYin}</td></tr>
+      <tr class="he-row"><td>合宫</td><td colspan="3"><b>${he.heBranch || '未定义'}</b> 宫</td></tr>
+      <tr class="he-row"><td>三合</td><td colspan="3"><b>${he.sanhe.join(' → ')}</b></td></tr>
+    </tbody>
+  </table>`;
+}
+[fhMonthSelect, fhYearSelect, fhMonthBranchSelect, fhDaySelect, fhHourSelect, fhDayYinSelect].forEach(el => el.addEventListener('change', renderFH));
+
+setTimeout(() => { loadFHCurrentTime(); loadTGCurrentTime(); }, 500);
+
+
+// ==========================================
+// 天罡小六壬逻辑
+// ==========================================
+const tgMonth = document.getElementById('tg-month');
+const tgDayNum = document.getElementById('tg-day-num');
+const tgYearG = document.getElementById('tg-year-g'); const tgYearZ = document.getElementById('tg-year-z');
+const tgMonthG = document.getElementById('tg-month-g'); const tgMonthZ = document.getElementById('tg-month-z');
+const tgDayG = document.getElementById('tg-day-g'); const tgDayZ = document.getElementById('tg-day-z');
+const tgHourG = document.getElementById('tg-hour-g'); const tgHourZ = document.getElementById('tg-hour-z');
+const tgShenshaGrid = document.getElementById('tg-shensha-grid');
+
+for(let i=1; i<=12; i++) tgMonth.appendChild(new Option(`${i} 月`, i));
+for(let i=1; i<=30; i++) tgDayNum.appendChild(new Option(`${i} 日`, i));
+stems.forEach(s => { tgYearG.appendChild(new Option(s,s)); tgMonthG.appendChild(new Option(s,s)); tgDayG.appendChild(new Option(s,s)); tgHourG.appendChild(new Option(s,s)); });
+
+function updateBranches(ganSel, zhiSel, defaultZhi) {
+  const gan = ganSel.value;
+  const isYangGan = yangStems.includes(gan);
+  const allowedBranches = isYangGan ? yangBranches : yinBranches;
+  
+  const currentZhi = zhiSel.value;
+  zhiSel.innerHTML = '';
+  allowedBranches.forEach(b => zhiSel.appendChild(new Option(b, b)));
+  
+  if (allowedBranches.includes(currentZhi)) {
+    zhiSel.value = currentZhi;
+  } else {
+    zhiSel.value = defaultZhi || allowedBranches[0];
+  }
+}
+
+// ================= 双向同步逻辑 =================
+let syncLock = false;
+
+function syncBaZiToLunar() {
+  if (syncLock) return;
+  syncLock = true;
+  
+  if (typeof Lunar !== 'undefined') {
+    const yG = tgYearG.value, yZ = tgYearZ.value;
+    const mG = tgMonthG.value, mZ = tgMonthZ.value;
+    const dG = tgDayG.value, dZ = tgDayZ.value;
+    const hG = tgHourG.value, hZ = tgHourZ.value;
+    
+    try {
+      const lunarList = Lunar.fromBaZi(yG+yZ, mG+mZ, dG+dZ, hG+hZ, 2);
+      if (lunarList && lunarList.length > 0) {
+        const nowYear = new Date().getFullYear();
+        let bestLunar = lunarList[0];
+        for (let l of lunarList) {
+          if (Math.abs(l.getYear() - nowYear) < Math.abs(bestLunar.getYear() - nowYear)) {
+            bestLunar = l;
+          }
+        }
+        tgMonth.value = Math.abs(bestLunar.getMonth());
+        tgDayNum.value = bestLunar.getDay();
+      }
+    } catch(e) {
+      console.log("反推农历出错:", e);
+    }
+  }
+  
+  calcTiangang();
+  syncLock = false;
+}
+
+function syncLunarToBaZi() {
+  if (syncLock) return;
+  syncLock = true;
+  
+  const m = parseInt(tgMonth.value);
+  const d = parseInt(tgDayNum.value);
+  
+  const yG = tgYearG.value, yZ = tgYearZ.value;
+  
+  if (typeof Lunar !== 'undefined') {
+    let targetYear = new Date().getFullYear();
+    
+    for(let offset = 0; offset <= 30; offset++) {
+      const testYears = [targetYear - offset, targetYear + offset];
+      let found = false;
+      for(let ty of testYears) {
+        if (Lunar.fromYmd(ty, 1, 1).getYearInGanZhi() === yG + yZ) {
+          targetYear = ty;
+          found = true;
+          break;
+        }
+      }
+      if(found) break;
+    }
+    
+    try {
+      const lunar = Lunar.fromYmd(targetYear, m, d);
+      const ec = lunar.getEightChar();
+      const pillars = [ec.getYear(), ec.getMonth(), ec.getDay(), ec.getTime()];
+      const gzList = [tgYearG, tgMonthG, tgDayG, tgHourG];
+      const zhiList = [tgYearZ, tgMonthZ, tgDayZ, tgHourZ];
+      
+      pillars.forEach((p, idx) => {
+        gzList[idx].value = p[0];
+        updateBranches(gzList[idx], zhiList[idx], p[1]); 
+        zhiList[idx].value = p[1]; 
+      });
+    } catch(e) {
+      console.log("农历转四柱出错:", e);
+    }
+  }
+  
+  calcTiangang();
+  syncLock = false;
+}
+
+// 绑定四柱变化事件
+tgYearG.addEventListener('change', () => { updateBranches(tgYearG, tgYearZ, '午'); syncBaZiToLunar(); });
+tgMonthG.addEventListener('change', () => { updateBranches(tgMonthG, tgMonthZ, '戌'); syncBaZiToLunar(); });
+tgDayG.addEventListener('change', () => { updateBranches(tgDayG, tgDayZ, '酉'); syncBaZiToLunar(); });
+tgHourG.addEventListener('change', () => { updateBranches(tgHourG, tgHourZ, '寅'); syncBaZiToLunar(); });
+
+tgYearZ.addEventListener('change', syncBaZiToLunar);
+tgMonthZ.addEventListener('change', syncBaZiToLunar);
+tgDayZ.addEventListener('change', syncBaZiToLunar);
+tgHourZ.addEventListener('change', syncBaZiToLunar);
+
+// 绑定农历变化事件
+tgMonth.addEventListener('change', syncLunarToBaZi);
+tgDayNum.addEventListener('change', syncLunarToBaZi);
+
+// 一键读取当前时间
+function loadTGCurrentTime() {
+  if (typeof Lunar === 'undefined') {
+    alert("农历库尚未加载完成，请稍后再试。");
+    return;
+  }
+  syncLock = true;
+  
+  const now = new Date();
+  const lunar = Lunar.fromDate(now);
+  
+  const lMonth = Math.abs(lunar.getMonth());
+  const lDay = lunar.getDay();
+  tgMonth.value = lMonth;
+  tgDayNum.value = lDay;
+  
+  const ec = lunar.getEightChar();
+  const pillars = [ec.getYear(), ec.getMonth(), ec.getDay(), ec.getTime()];
+  const gzList = [tgYearG, tgMonthG, tgDayG, tgHourG];
+  const zhiList = [tgYearZ, tgMonthZ, tgDayZ, tgHourZ];
+  
+  pillars.forEach((p, idx) => {
+    const g = p[0];
+    const z = p[1];
+    gzList[idx].value = g;
+    updateBranches(gzList[idx], zhiList[idx], z); 
+    zhiList[idx].value = z; 
+  });
+  
+  syncLock = false;
+  calcTiangang();
+}
+
+const douMapping = {
+  1: '丑', 2: '子', 3: '亥', 4: '戌', 5: '酉', 6: '戌',
+  7: '亥', 8: '子', 9: '丑', 10: '寅', 11: '卯', 12: '寅'
+};
+
+function getXunKong(dayG, dayZ) {
+  const ganIdx = stems.indexOf(dayG);
+  const zhiIdx = branches.indexOf(dayZ);
+  let index = 0;
+  for(let i=0; i<60; i++) {
+    if (i % 10 === ganIdx && i % 12 === zhiIdx) { index = i; break; }
+  }
+  const xunKongTable = [
+    ['戌','亥'], ['申','酉'], ['午','未'], ['辰','巳'], ['寅','卯'], ['子','丑']
+  ];
+  return xunKongTable[Math.floor(index / 10)];
+}
+
+const changshengList = ['长生','沐浴','冠带','临官','帝旺','衰','病','死','墓','绝','胎','养'];
+function getChangsheng(startZhiIdx) {
+  const res = {};
+  for (let i = 0; i < 12; i++) res[branches[(startZhiIdx + i) % 12]] = changshengList[i];
+  return res;
+}
+const csStartMap = { '甲': 11, '乙': 6, '丙': 2, '丁': 9, '戊': 2, '己': 9, '庚': 5, '辛': 0, '壬': 8, '癸': 3 };
+const nayinWuxing = ['金','火','木','土','金','火','水','土','金','木','水','土','火','木','水','金','火','木','水','金','土','火','木','土','金','火','木','水','土','金'];
+const wuxingCsStart = { '金': 5, '木': 11, '水': 8, '火': 2, '土': 8 };
+
+function calcTiangang() {
+  const m = parseInt(tgMonth.value);
+  const dayNum = parseInt(tgDayNum.value);
+  const yearG = tgYearG.value;
+  const yearZ = tgYearZ.value;
+  const monthG = tgMonthG.value;
+  const monthZ = tgMonthZ.value;
+  const dayG = tgDayG.value;
+  const dayZ = tgDayZ.value;
+  const hourG = tgHourG.value;
+  const hourZ = tgHourZ.value;
+  
+  const yIdx = branches.indexOf(yearZ);
+  const mIdx = branches.indexOf(monthZ);
+  const dIdx = branches.indexOf(dayZ);
+  const hIdx = branches.indexOf(hourZ);
+  
+  let normalDou = douMapping[m];
+  let baseZhi = normalDou;
+  
+  // 6-9月与12月取对冲
+  let isChong = (m >= 6 && m <= 9) || m === 12;
+  if (isChong) baseZhi = branches[(branches.indexOf(normalDou) + 6) % 12];
+  
+  const baseZhiIdx = branches.indexOf(baseZhi);
+  const dayLandIdx = (baseZhiIdx + (dayNum - 1)) % 12;
+  const dayLandZhi = branches[dayLandIdx];
+  const hourLandIdx = (dayLandIdx + hIdx) % 12;
+  const hourLandZhi = branches[hourLandIdx];
+  const yearLandIdx = (hourLandIdx + yIdx) % 12;
+  const yearLandZhi = branches[yearLandIdx];
+  
+  const xunKong = getXunKong(dayG, dayZ);
+
+  const tgInfo = document.getElementById('tg-info');
+  tgInfo.innerHTML = `
+    <b>四柱：</b>${yearG}${yearZ} ${monthG}${monthZ} ${dayG}${dayZ}（旬空：<span style="color:#d9534f">${xunKong.join('、')}</span>） ${hourG}${hourZ}<br>
+    <b>北斗所在：</b>${baseZhi}
+  `;
+  
+  const tgSteps = document.getElementById('tg-steps');
+  tgSteps.innerHTML = `
+    1. <b>定北斗：</b>${m}月北斗在 <span>${baseZhi}</span> 宫。<br>
+    2. <b>起日顺日：</b>在 <span>${baseZhi}</span> 宫起初一，顺数至 ${dayNum} 日，落于 <span>${dayLandZhi}</span> 宫。<br>
+    3. <b>日上起时：</b>在 <span>${dayLandZhi}</span> 宫起子，顺数至占时 <span>${hourZ}</span>（${hIdx + 1}位），落于 <span>${hourLandZhi}</span> 宫。<br>
+    4. <b>时上起年：</b>在 <span>${hourLandZhi}</span> 宫起子，顺数至占年 <span>${yearZ}</span>（${yIdx + 1}位），落于 <span>${yearLandZhi}</span> 宫。<br>
+  `;
+
+  const tgBoard = document.getElementById('tg-board');
+  tgBoard.innerHTML = `
+    <div class="tg-pillars-display">
+      <span>${yearG}${yearZ}</span>
+      <span>${monthG}${monthZ}</span>
+      <span>${dayG}${dayZ} <span class="xunkong">(空:${xunKong.join('、')})</span></span>
+      <span>${hourG}${hourZ}</span>
+    </div>
+    <div class="square-grid">
+      <div class="ground-bg">
+        <div class="ground-cross"></div>
+        <div class="ground-cross vertical"></div>
+      </div>
+      <div class="cell empty"></div>
+      <div class="cell">${baseZhi}<span class="cell-sub">起日</span></div>
+      <div class="cell empty"></div>
+      <div class="cell">${dayLandZhi}<span class="cell-sub">日落</span></div>
+      <div class="cell center">天罡定局</div>
+      <div class="cell">${hourLandZhi}<span class="cell-sub">时落</span></div>
+      <div class="cell empty"></div>
+      <div class="cell">${yearLandZhi}<span class="cell-sub">年落</span></div>
+      <div class="cell empty"></div>
+    </div>
+    <div class="note">（地盘：左卯右酉，上午下子）</div>
+  `;
+
+  const shenshaData = {};
+  branches.forEach(b => shenshaData[b] = []);
+  
+  const dsStart = csStartMap[dayG];
+  const dsMap = getChangsheng(dsStart);
+  for (let b in dsMap) shenshaData[b].push({ name: `日干${dsMap[b]}`, type: 'cs' });
+
+  const sanheMap = {
+    '申子辰': { cs: 8, lin: 11, jue: 5, bing: 2, mu: 4, wang: 0, si: 3 },
+    '寅午戌': { cs: 2, lin: 5, jue: 11, bing: 8, mu: 10, wang: 6, si: 9 },
+    '巳酉丑': { cs: 5, lin: 8, jue: 2, bing: 11, mu: 1, wang: 9, si: 0 },
+    '亥卯未': { cs: 11, lin: 2, jue: 8, bing: 5, mu: 7, wang: 3, si: 6 }
+  };
+  let sanheGroup = '';
+  if (['申','子','辰'].includes(yearZ)) sanheGroup = '申子辰';
+  else if (['寅','午','戌'].includes(yearZ)) sanheGroup = '寅午戌';
+  else if (['巳','酉','丑'].includes(yearZ)) sanheGroup = '巳酉丑';
+  else if (['亥','卯','未'].includes(yearZ)) sanheGroup = '亥卯未';
+  
+  if (sanheGroup) {
+    const info = sanheMap[sanheGroup];
+    shenshaData[branches[info.lin]].push({ name: '亡神', type: 'sha' });
+    shenshaData[branches[info.jue]].push({ name: '劫杀', type: 'sha' });
+    shenshaData[branches[info.bing]].push({ name: '驿马', type: 'sha' });
+    shenshaData[branches[info.cs + 1]].push({ name: '咸池', type: 'sha' }); 
+    shenshaData[branches[info.mu]].push({ name: '华盖', type: 'sha' });
+    shenshaData[branches[info.wang]].push({ name: '将星', type: 'sha' });
+    shenshaData[branches[info.si]].push({ name: '六厄', type: 'sha' });
+    shenshaData[branches[(info.wang + 6) % 12]].push({ name: '灾煞', type: 'sha' });
+  }
+
+  let guChen, guaSu;
+  if (['亥','子','丑'].includes(yearZ)) { guChen = '寅'; guaSu = '戌'; }
+  else if (['寅','卯','辰'].includes(yearZ)) { guChen = '巳'; guaSu = '丑'; }
+  else if (['巳','午','未'].includes(yearZ)) { guChen = '申'; guaSu = '辰'; }
+  else if (['申','酉','戌'].includes(yearZ)) { guChen = '亥'; guaSu = '未'; }
+  if (guChen) shenshaData[guChen].push({ name: '孤辰', type: 'sha' });
+  if (guaSu) shenshaData[guaSu].push({ name: '寡宿', type: 'sha' });
+
+  const ysStart = csStartMap[yearG];
+  shenshaData[branches[ysStart]].push({ name: '学堂(年)', type: 'cs' });
+  shenshaData[branches[(ysStart + 4) % 12]].push({ name: '羊刃(年)', type: 'sha' });
+  shenshaData[branches[(ysStart + 4 + 6) % 12]].push({ name: '飞刃(年)', type: 'sha' });
+  shenshaData[branches[(ysStart + 3) % 12]].push({ name: '禄勋(年)', type: 'cs' });
+
+  const tyMap = {
+    '甲':['丑','未'], '戊':['丑','未'], '庚':['丑','未'], '乙':['子','申'], '己':['子','申'],
+    '丙':['亥','酉'], '丁':['亥','酉'], '壬':['卯','巳'], '癸':['卯','巳'], '辛':['午','寅']
+  };
+  tyMap[yearG].forEach(b => shenshaData[b].push({ name: '天乙', type: 'cs' }));
+
+  const wcMap = { '甲':'巳', '乙':'午', '丙':'巳', '丁':'午', '戊':'申', '己':'酉', '庚':'亥', '辛':'子', '壬':'寅', '癸':'卯' };
+  shenshaData[wcMap[yearG]].push({ name: '文昌', type: 'cs' });
+
+  const tgMap = { '甲':'未', '乙':'辰', '丙':'巳', '丁':'寅', '戊':'丑', '己':'戌', '庚':'亥', '辛':'申', '壬':'酉', '癸':'午' };
+  shenshaData[tgMap[yearG]].push({ name: '天官', type: 'cs' });
+
+  const tguMap = { '甲':'酉', '乙':'申', '丙':'子', '丁':'亥', '戊':'卯', '己':'寅', '庚':'午', '辛':'巳', '壬':'午', '癸':'巳' };
+  shenshaData[tguMap[yearG]].push({ name: '天贵', type: 'cs' });
+
+  const douGouIdx = (mIdx + (hIdx - 10 + 12) % 12) % 12;
+  shenshaData[branches[douGouIdx]].push({ name: '斗构', type: 'cs' });
+
+  const hongLuanIdx = (3 - yIdx + 12) % 12;
+  shenshaData[branches[hongLuanIdx]].push({ name: '红鸾', type: 'cs' });
+  shenshaData[branches[(hongLuanIdx + 6) % 12]].push({ name: '天喜', type: 'cs' });
+
+  let poSui = '丑';
+  if (['寅','申','巳','亥'].includes(yearZ)) poSui = '酉';
+  else if (['子','午','卯','酉'].includes(yearZ)) poSui = '巳';
+  shenshaData[poSui].push({ name: '破碎', type: 'sha' });
+
+  const gyMap = { '甲':'戌', '乙':'亥', '丙':'丑', '丁':'寅', '戊':'丑', '己':'寅', '庚':'辰', '辛':'巳', '壬':'未', '癸':'申' };
+  shenshaData[gyMap[yearG]].push({ name: '国印', type: 'cs' });
+
+  shenshaData[branches[(yIdx + 2) % 12]].push({ name: '天雄', type: 'sha' });
+  shenshaData[branches[(yIdx + 8) % 12]].push({ name: '地雌', type: 'sha' });
+  shenshaData[branches[(yIdx + 4) % 12]].push({ name: '年符', type: 'sha' });
+  shenshaData[branches[(yIdx + 5) % 12]].push({ name: '小耗', type: 'sha' });
+  shenshaData[branches[(yIdx + 6) % 12]].push({ name: '大耗', type: 'sha' });
+
+  let gzIndex = 0;
+  for(let i=0; i<60; i++) if (i % 10 === stems.indexOf(yearG) && i % 12 === yIdx) { gzIndex = i; break; }
+  const nayin = nayinWuxing[Math.floor(gzIndex / 2)];
+  const nyMap = getChangsheng(wuxingCsStart[nayin]);
+  for (let b in nyMap) shenshaData[b].push({ name: `纳音${nyMap[b]}`, type: 'cs' });
+
+  tgShenshaGrid.innerHTML = branches.map(b => {
+    const list = shenshaData[b];
+    const uniqueList = Array.from(new Set(list.map(item => JSON.stringify(item)))).map(item => JSON.parse(item));
+    const tags = uniqueList.map(item => `<span class="tag ${item.type}">${item.name}</span>`).join('');
+    return `<div class="shensha-card">
+      <div class="zhi">${b}</div>
+      <div class="tag-group">${tags || '<span style="color:#ccc">无</span>'}</div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('tg-calc-btn').addEventListener('click', calcTiangang);
+</script>
+</body>
+</html>
