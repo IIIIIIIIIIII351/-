@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>术数排盘平台</title>
-<!-- 引入轻量级农历/八字库，用于精准获取当前时间 -->
+<!-- 引入轻量级农历/八字库 -->
 <script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.6.12/lunar.js"></script>
 <style>
   :root {
@@ -125,15 +125,29 @@
   .cell.center { font-size: 14px; color: var(--muted); text-align: center; line-height: 1.4; background: var(--paper); z-index: 2;}
   .cell-sub { font-size: 12px; color: var(--muted); font-weight: normal; margin-top: 4px; }
 
+  /* 神煞辅助区 */
   details { margin-top: 20px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
   summary { cursor: pointer; font-weight: bold; color: var(--primary); padding: 5px; outline: none; }
-  .shensha-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 15px; }
-  .shensha-card { background: #f3eee4; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 12px; }
-  .shensha-card .zhi { font-size: 16px; font-weight: bold; color: var(--primary); border-bottom: 1px dashed var(--line); padding-bottom: 4px; margin-bottom: 4px; text-align: center; }
-  .shensha-card .tag-group { display: flex; flex-wrap: wrap; gap: 4px; }
-  .shensha-card .tag { background: #fff; padding: 2px 4px; border-radius: 4px; color: var(--ink); }
-  .shensha-card .tag.cs { background: #eef6f0; color: #2f5d50; }
-  .shensha-card .tag.sha { background: #f8eef4; color: #7a2f5a; }
+  
+  .shensha-group-title { font-size: 16px; font-weight: bold; margin: 15px 0 10px; color: var(--primary); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .shensha-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  
+  .shensha-card { background: #f9f6f0; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 13px; }
+  .shensha-card .zhi { font-size: 18px; font-weight: bold; color: var(--primary); border-bottom: 1px dashed var(--line); padding-bottom: 6px; margin-bottom: 6px; text-align: center; }
+  .shensha-card .tag-group { display: flex; flex-wrap: wrap; gap: 6px; }
+  
+  /* 神煞分类颜色 */
+  .tag { padding: 2px 6px; border-radius: 4px; font-size: 12px; border: 1px solid transparent; }
+  .tag-cat { font-weight: bold; margin-right: 2px; opacity: 0.8; }
+  
+  .cat-年 { background: #f0e6d2; border-color: #d8cbb6; color: #8c6d46; }
+  .cat-季 { background: #e6f0e6; border-color: #b6d8b6; color: #467a46; }
+  .cat-月 { background: #e6eef0; border-color: #b6cdd8; color: #466a7a; }
+  .cat-旬 { background: #f0e6f0; border-color: #d8b6d8; color: #7a467a; }
+  .cat-干 { background: #f0e6e6; border-color: #d8b6b6; color: #7a4646; }
+  .cat-支 { background: #e6f0f0; border-color: #b6d8d8; color: #467a7a; }
+  .cat-长 { background: #f5ebd4; border-color: #e6c875; color: #9c6b10; font-weight: bold;}
+  .cat-其 { background: #eeeeee; border-color: #cccccc; color: #555555; }
 
   .note { color: var(--muted); font-size: 12px; line-height: 1.8; margin-top: 10px; text-align: center; }
   .flower-detail { font-size: 12px; color: var(--muted); display: block; margin-top: 2px;}
@@ -545,7 +559,6 @@ function updateBranches(ganSel, zhiSel, defaultZhi) {
   }
 }
 
-// ================= 双向同步逻辑 =================
 let syncLock = false;
 
 function syncBaZiToLunar() {
@@ -626,7 +639,6 @@ function syncLunarToBaZi() {
   syncLock = false;
 }
 
-// 绑定四柱变化事件
 tgYearG.addEventListener('change', () => { updateBranches(tgYearG, tgYearZ, '午'); syncBaZiToLunar(); });
 tgMonthG.addEventListener('change', () => { updateBranches(tgMonthG, tgMonthZ, '戌'); syncBaZiToLunar(); });
 tgDayG.addEventListener('change', () => { updateBranches(tgDayG, tgDayZ, '酉'); syncBaZiToLunar(); });
@@ -637,11 +649,9 @@ tgMonthZ.addEventListener('change', syncBaZiToLunar);
 tgDayZ.addEventListener('change', syncBaZiToLunar);
 tgHourZ.addEventListener('change', syncBaZiToLunar);
 
-// 绑定农历变化事件
 tgMonth.addEventListener('change', syncLunarToBaZi);
 tgDayNum.addEventListener('change', syncLunarToBaZi);
 
-// 一键读取当前时间
 function loadTGCurrentTime() {
   if (typeof Lunar === 'undefined') {
     alert("农历库尚未加载完成，请稍后再试。");
@@ -679,17 +689,20 @@ const douMapping = {
   7: '亥', 8: '子', 9: '丑', 10: '寅', 11: '卯', 12: '寅'
 };
 
-function getXunKong(dayG, dayZ) {
+function getXunIndex(dayG, dayZ) {
   const ganIdx = stems.indexOf(dayG);
   const zhiIdx = branches.indexOf(dayZ);
-  let index = 0;
   for(let i=0; i<60; i++) {
-    if (i % 10 === ganIdx && i % 12 === zhiIdx) { index = i; break; }
+    if (i % 10 === ganIdx && i % 12 === zhiIdx) return Math.floor(i / 10);
   }
+  return 0;
+}
+
+function getXunKong(dayG, dayZ) {
   const xunKongTable = [
     ['戌','亥'], ['申','酉'], ['午','未'], ['辰','巳'], ['寅','卯'], ['子','丑']
   ];
-  return xunKongTable[Math.floor(index / 10)];
+  return xunKongTable[getXunIndex(dayG, dayZ)];
 }
 
 const changshengList = ['长生','沐浴','冠带','临官','帝旺','衰','病','死','墓','绝','胎','养'];
@@ -699,8 +712,14 @@ function getChangsheng(startZhiIdx) {
   return res;
 }
 const csStartMap = { '甲': 11, '乙': 6, '丙': 2, '丁': 9, '戊': 2, '己': 9, '庚': 5, '辛': 0, '壬': 8, '癸': 3 };
-const nayinWuxing = ['金','火','木','土','金','火','水','土','金','木','水','土','火','木','水','金','火','木','水','金','土','火','木','土','金','火','木','水','土','金'];
-const wuxingCsStart = { '金': 5, '木': 11, '水': 8, '火': 2, '土': 8 };
+
+// 农历月建（月支）与季节映射
+function getSeason(mZhi) {
+  if (['寅','卯','辰'].includes(mZhi)) return '春';
+  if (['巳','午','未'].includes(mZhi)) return '夏';
+  if (['申','酉','戌'].includes(mZhi)) return '秋';
+  return '冬';
+}
 
 function calcTiangang() {
   const m = parseInt(tgMonth.value);
@@ -722,7 +741,6 @@ function calcTiangang() {
   let normalDou = douMapping[m];
   let baseZhi = normalDou;
   
-  // 6-9月与12月取对冲
   let isChong = (m >= 6 && m <= 9) || m === 12;
   if (isChong) baseZhi = branches[(branches.indexOf(normalDou) + 6) % 12];
   
@@ -778,95 +796,138 @@ function calcTiangang() {
 
   const shenshaData = {};
   branches.forEach(b => shenshaData[b] = []);
-  
-  const dsStart = csStartMap[dayG];
-  const dsMap = getChangsheng(dsStart);
-  for (let b in dsMap) shenshaData[b].push({ name: `日干${dsMap[b]}`, type: 'cs' });
 
-  const sanheMap = {
-    '申子辰': { cs: 8, lin: 11, jue: 5, bing: 2, mu: 4, wang: 0, si: 3 },
-    '寅午戌': { cs: 2, lin: 5, jue: 11, bing: 8, mu: 10, wang: 6, si: 9 },
-    '巳酉丑': { cs: 5, lin: 8, jue: 2, bing: 11, mu: 1, wang: 9, si: 0 },
-    '亥卯未': { cs: 11, lin: 2, jue: 8, bing: 5, mu: 7, wang: 3, si: 6 }
-  };
-  let sanheGroup = '';
-  if (['申','子','辰'].includes(yearZ)) sanheGroup = '申子辰';
-  else if (['寅','午','戌'].includes(yearZ)) sanheGroup = '寅午戌';
-  else if (['巳','酉','丑'].includes(yearZ)) sanheGroup = '巳酉丑';
-  else if (['亥','卯','未'].includes(yearZ)) sanheGroup = '亥卯未';
-  
-  if (sanheGroup) {
-    const info = sanheMap[sanheGroup];
-    shenshaData[branches[info.lin]].push({ name: '亡神', type: 'sha' });
-    shenshaData[branches[info.jue]].push({ name: '劫杀', type: 'sha' });
-    shenshaData[branches[info.bing]].push({ name: '驿马', type: 'sha' });
-    shenshaData[branches[info.cs + 1]].push({ name: '咸池', type: 'sha' }); 
-    shenshaData[branches[info.mu]].push({ name: '华盖', type: 'sha' });
-    shenshaData[branches[info.wang]].push({ name: '将星', type: 'sha' });
-    shenshaData[branches[info.si]].push({ name: '六厄', type: 'sha' });
-    shenshaData[branches[(info.wang + 6) % 12]].push({ name: '灾煞', type: 'sha' });
+  function addShensha(branch, name, cat) {
+    shenshaData[branch].push({ name, cat });
   }
 
-  let guChen, guaSu;
-  if (['亥','子','丑'].includes(yearZ)) { guChen = '寅'; guaSu = '戌'; }
-  else if (['寅','卯','辰'].includes(yearZ)) { guChen = '巳'; guaSu = '丑'; }
-  else if (['巳','午','未'].includes(yearZ)) { guChen = '申'; guaSu = '辰'; }
-  else if (['申','酉','戌'].includes(yearZ)) { guChen = '亥'; guaSu = '未'; }
-  if (guChen) shenshaData[guChen].push({ name: '孤辰', type: 'sha' });
-  if (guaSu) shenshaData[guaSu].push({ name: '寡宿', type: 'sha' });
+  // 1. 日干十二长生
+  const dsStart = csStartMap[dayG];
+  const dsMap = getChangsheng(dsStart);
+  for (let b in dsMap) addShensha(b, `日干${dsMap[b]}`, '长');
 
-  const ysStart = csStartMap[yearG];
-  shenshaData[branches[ysStart]].push({ name: '学堂(年)', type: 'cs' });
-  shenshaData[branches[(ysStart + 4) % 12]].push({ name: '羊刃(年)', type: 'sha' });
-  shenshaData[branches[(ysStart + 4 + 6) % 12]].push({ name: '飞刃(年)', type: 'sha' });
-  shenshaData[branches[(ysStart + 3) % 12]].push({ name: '禄勋(年)', type: 'cs' });
+  // 2. 岁煞 (基于年支)
+  addShensha(yearZ, '太岁', '年');
+  const oldYearZ = branches[(yIdx + 11) % 12];
+  addShensha(oldYearZ, '病符', '年');
+  const poSuiZ = branches[(yIdx + 6) % 12];
+  addShensha(poSuiZ, '岁破(大耗)', '年');
+  const sangMen = branches[(yIdx + 9) % 12]; // 退三
+  addShensha(sangMen, '丧门', '年');
+  const diaoKe = branches[(yIdx + 3) % 12]; // 进三
+  addShensha(diaoKe, '吊客', '年');
 
-  const tyMap = {
-    '甲':['丑','未'], '戊':['丑','未'], '庚':['丑','未'], '乙':['子','申'], '己':['子','申'],
-    '丙':['亥','酉'], '丁':['亥','酉'], '壬':['卯','巳'], '癸':['卯','巳'], '辛':['午','寅']
+  // 3. 季煞
+  const season = getSeason(monthZ);
+  let xiErBase, huoGuiBase, guChen, guaSu;
+  if (season === '春') {
+    xiErBase = '戌'; huoGuiBase = '午'; guChen = '巳'; guaSu = '丑';
+  } else if (season === '夏') {
+    xiErBase = '丑'; huoGuiBase = '酉'; guChen = '申'; guaSu = '辰';
+  } else if (season === '秋') {
+    xiErBase = '辰'; huoGuiBase = '子'; guChen = '亥'; guaSu = '未';
+  } else {
+    xiErBase = '未'; huoGuiBase = '卯'; guChen = '寅'; guaSu = '戌';
+  }
+  addShensha(xiErBase, '天喜', '季');
+  addShensha(xiErBase, '天耳', '季');
+  addShensha(guChen, '孤辰', '季');
+  addShensha(guaSu, '寡宿', '季');
+  addShensha(huoGuiBase, '火鬼', '季');
+
+  // 4. 月煞 (基于月建 mIdx)
+  const sqIdx = (mIdx - 2 + 12) % 12;
+  addShensha(branches[sqIdx], '生气', '月');
+  addShensha(branches[(sqIdx + 6) % 12], '死气', '月');
+  addShensha(branches[(sqIdx + 7) % 12], '死神', '月');
+  const tyIdx = (mIdx - 4 + 12) % 12;
+  addShensha(branches[tyIdx], '天医', '月');
+  addShensha(branches[(tyIdx + 6) % 12], '地医', '月');
+  addShensha(branches[(mIdx - 1 + 12) % 12], '血支', '月');
+  
+  // 血忌：正月丑，二未，三寅，四申...
+  const xueJiTable = ['丑','未','寅','申','卯','酉','辰','戌','巳','亥','午','子'];
+  addShensha(xueJiTable[m - 1], '血忌', '月');
+
+  // 月厌：正月戌逆推
+  const yueYanIdx = (10 - (m - 1) + 12) % 12;
+  addShensha(branches[yueYanIdx], '月厌', '月');
+
+  // 天鬼：正月酉逆推四仲 (酉午卯子)
+  const tianGuiTable = ['酉','午','卯','子','酉','午','卯','子','酉','午','卯','子'];
+  addShensha(tianGuiTable[m - 1], '天鬼', '月');
+
+  // 5. 旬煞 (基于日柱旬)
+  const xunIdx = getXunIndex(dayG, dayZ);
+  const xunGans = ['甲','丙','戊','庚','壬','甲','丙','戊','庚','壬'];
+  const xunZhis = ['子','寅','辰','午','申','戌','子','寅','辰','午'];
+  const xunStartGan = xunGans[xunIdx];
+  const xunStartZhi = xunZhis[xunIdx];
+  
+  // 丁马：旬中丁
+  let dingGanIdx = stems.indexOf('丁');
+  let diff = (dingGanIdx - stems.indexOf(xunStartGan) + 10) % 10;
+  const dingIdx = (branches.indexOf(xunStartZhi) + diff) % 12;
+  addShensha(branches[dingIdx], '丁马', '旬');
+
+  addShensha(xunStartZhi, '旬仪', '旬');
+
+  // 旬尾：旬中癸
+  let guiGanIdx = stems.indexOf('癸');
+  let diffGui = (guiGanIdx - stems.indexOf(xunStartGan) + 10) % 10;
+  const guiIdx = (branches.indexOf(xunStartZhi) + diffGui) % 12;
+  addShensha(branches[guiIdx], '旬尾(闭口)', '旬');
+
+  // 6. 干煞 (基于日干)
+  const deMap = { '甲':'寅', '乙':'申', '丙':'巳', '丁':'亥', '戊':'巳', '己':'寅', '庚':'申', '辛':'巳', '壬':'亥', '癸':'巳' };
+  addShensha(deMap[dayG], '日德', '干');
+
+  const youDuMap = { '甲':'丑', '己':'丑', '乙':'子', '庚':'子', '丙':'寅', '辛':'寅', '丁':'巳', '壬':'巳', '戊':'申', '癸':'申' };
+  addShensha(youDuMap[dayG], '游都', '干');
+
+  const luMap = { '甲':'寅', '乙':'卯', '丙':'巳', '丁':'午', '戊':'巳', '己':'午', '庚':'申', '辛':'酉', '壬':'亥', '癸':'子' };
+  addShensha(luMap[dayG], '禄神', '干');
+
+  // 7. 支煞 (基于日支)
+  const sanheMap = {
+    '申子辰': { ma: '寅', tao: '酉', hua: '辰', jie: '巳', yang: '子' },
+    '寅午戌': { ma: '申', tao: '卯', hua: '戌', jie: '亥', yang: '午' },
+    '巳酉丑': { ma: '亥', tao: '午', hua: '丑', jie: '寅', yang: '酉' },
+    '亥卯未': { ma: '巳', tao: '子', hua: '未', jie: '申', yang: '卯' }
   };
-  tyMap[yearG].forEach(b => shenshaData[b].push({ name: '天乙', type: 'cs' }));
+  let sanheGroup = '';
+  if (['申','子','辰'].includes(dayZ)) sanheGroup = '申子辰';
+  else if (['寅','午','戌'].includes(dayZ)) sanheGroup = '寅午戌';
+  else if (['巳','酉','丑'].includes(dayZ)) sanheGroup = '巳酉丑';
+  else if (['亥','卯','未'].includes(dayZ)) sanheGroup = '亥卯未';
 
-  const wcMap = { '甲':'巳', '乙':'午', '丙':'巳', '丁':'午', '戊':'申', '己':'酉', '庚':'亥', '辛':'子', '壬':'寅', '癸':'卯' };
-  shenshaData[wcMap[yearG]].push({ name: '文昌', type: 'cs' });
+  if (sanheGroup) {
+    const info = sanheMap[sanheGroup];
+    addShensha(info.ma, '驿马', '支');
+    addShensha(info.tao, '桃花(悬绳)', '支');
+    addShensha(info.hua, '华盖', '支');
+    addShensha(info.jie, '劫煞', '支');
+  }
 
-  const tgMap = { '甲':'未', '乙':'辰', '丙':'巳', '丁':'寅', '戊':'丑', '己':'戌', '庚':'亥', '辛':'申', '壬':'酉', '癸':'午' };
-  shenshaData[tgMap[yearG]].push({ name: '天官', type: 'cs' });
+  // 破碎
+  let poSuiZhi = '丑';
+  if (['寅','申','巳','亥'].includes(dayZ)) poSuiZhi = '酉';
+  else if (['子','午','卯','酉'].includes(dayZ)) poSuiZhi = '巳';
+  addShensha(poSuiZhi, '破碎', '支');
 
-  const tguMap = { '甲':'酉', '乙':'申', '丙':'子', '丁':'亥', '戊':'卯', '己':'寅', '庚':'午', '辛':'巳', '壬':'午', '癸':'巳' };
-  shenshaData[tguMap[yearG]].push({ name: '天贵', type: 'cs' });
+  // 阳刃阴刃
+  if (yangStems.includes(dayG)) {
+    const yangRenIdx = (branches.indexOf(luMap[dayG]) + 1) % 12;
+    addShensha(branches[yangRenIdx], '阳刃', '支');
+  } else {
+    const yinRenIdx = (branches.indexOf(luMap[dayG]) - 1 + 12) % 12;
+    addShensha(branches[yinRenIdx], '阴刃', '支');
+  }
 
-  const douGouIdx = (mIdx + (hIdx - 10 + 12) % 12) % 12;
-  shenshaData[branches[douGouIdx]].push({ name: '斗构', type: 'cs' });
-
-  const hongLuanIdx = (3 - yIdx + 12) % 12;
-  shenshaData[branches[hongLuanIdx]].push({ name: '红鸾', type: 'cs' });
-  shenshaData[branches[(hongLuanIdx + 6) % 12]].push({ name: '天喜', type: 'cs' });
-
-  let poSui = '丑';
-  if (['寅','申','巳','亥'].includes(yearZ)) poSui = '酉';
-  else if (['子','午','卯','酉'].includes(yearZ)) poSui = '巳';
-  shenshaData[poSui].push({ name: '破碎', type: 'sha' });
-
-  const gyMap = { '甲':'戌', '乙':'亥', '丙':'丑', '丁':'寅', '戊':'丑', '己':'寅', '庚':'辰', '辛':'巳', '壬':'未', '癸':'申' };
-  shenshaData[gyMap[yearG]].push({ name: '国印', type: 'cs' });
-
-  shenshaData[branches[(yIdx + 2) % 12]].push({ name: '天雄', type: 'sha' });
-  shenshaData[branches[(yIdx + 8) % 12]].push({ name: '地雌', type: 'sha' });
-  shenshaData[branches[(yIdx + 4) % 12]].push({ name: '年符', type: 'sha' });
-  shenshaData[branches[(yIdx + 5) % 12]].push({ name: '小耗', type: 'sha' });
-  shenshaData[branches[(yIdx + 6) % 12]].push({ name: '大耗', type: 'sha' });
-
-  let gzIndex = 0;
-  for(let i=0; i<60; i++) if (i % 10 === stems.indexOf(yearG) && i % 12 === yIdx) { gzIndex = i; break; }
-  const nayin = nayinWuxing[Math.floor(gzIndex / 2)];
-  const nyMap = getChangsheng(wuxingCsStart[nayin]);
-  for (let b in nyMap) shenshaData[b].push({ name: `纳音${nyMap[b]}`, type: 'cs' });
-
+  // ================== 渲染辅助区 ==================
   tgShenshaGrid.innerHTML = branches.map(b => {
     const list = shenshaData[b];
-    const uniqueList = Array.from(new Set(list.map(item => JSON.stringify(item)))).map(item => JSON.parse(item));
-    const tags = uniqueList.map(item => `<span class="tag ${item.type}">${item.name}</span>`).join('');
+    const tags = list.map(item => `<span class="tag cat-${item.cat}"><span class="tag-cat">[${item.cat}]</span>${item.name}</span>`).join('');
     return `<div class="shensha-card">
       <div class="zhi">${b}</div>
       <div class="tag-group">${tags || '<span style="color:#ccc">无</span>'}</div>
